@@ -9,7 +9,11 @@ public class TradingGateBackendApplication {
 
     public static void main(String[] args) {
         Dotenv dotenv = Dotenv.load();
-        System.setProperty("spring.profiles.active", dotenv.get("spring.profiles.active"));
+
+        dotenv.entries().forEach(entry -> {
+            System.setProperty(entry.getKey(), entry.getValue());
+        });
+
         SpringApplication.run(TradingGateBackendApplication.class, args);
     }
 }
