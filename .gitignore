@@ -35,3 +35,17 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### MacOS ###
+.DS_Store
+
+### Logs ###
+*.log
+
+### Temp Files ###
+*.tmp
+*.temp
+
+### Environment / Secrets ###
+.env
+.env.*

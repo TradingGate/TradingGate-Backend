@@ -1,0 +1,219 @@
+spring:
+  application:
+    name: TradingGate Backend
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        globally_quoted_identifiers: true
+
+  # ==========================
+  # Kafka
+  # ==========================
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER_HOST:localhost}:${KAFKA_BROKER_PORT:9092}
+
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: latest
+      enable-auto-commit: false
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+
+    listener:
+      ack-mode: MANUAL
+      missing-topics-fatal: false
+
+# ==========================
+# Redis
+# ==========================
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  # password: ${REDIS_PASSWORD:}
+
+# ==========================
+# Actuator
+# ==========================
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: health,info
+#  endpoint:
+#    health:
+#      show-details: when_authorized
+
+# ==========================
+# logging
+# ==========================
+logging:
+  level:
+    root: INFO
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE
+
+
+# ============================================
+#  Profile: local
+# ============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+server:
+  port: ${APP_PORT:8080}
+
+tradinggate:
+  env: local
+
+
+# ============================================
+#  Profile: api
+# ============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: api
+  datasource:
+    url: jdbc:postgresql://${TRADING_DB_HOST:localhost}:${TRADING_DB_PORT:5432}/${TRADING_DB_NAME:trading_db}
+    username: ${TRADING_DB_USER:trading_user}
+    password: ${TRADING_DB_PASSWORD:trading_pass}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    consumer:
+      group-id: trading-api
+
+server:
+  port: ${API_PORT:8080}
+
+tradinggate:
+  role: api
+  topics:
+    orders-in: orders.in
+    orders-updated: orders.updated
+    trades-executed: trades.executed
+
+
+# ============================================
+#  Profile: worker
+# ============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: worker
+  datasource:
+    url: jdbc:postgresql://${TRADING_DB_HOST:localhost}:${TRADING_DB_PORT:5432}/${TRADING_DB_NAME:trading_db}
+    username: ${TRADING_DB_USER:trading_user}
+    password: ${TRADING_DB_PASSWORD:trading_pass}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    consumer:
+      group-id: matching-worker
+
+server:
+  port: 0
+
+tradinggate:
+  role: worker
+  matching:
+    orders-in-topic: orders.in
+    trades-executed-topic: trades.executed
+    orders-updated-topic: orders.updated
+    risk-commands-topic: risk.commands
+    partitioning-key: symbol
+
+# ============================================
+#  Profile: risk
+# ============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: risk
+  datasource:
+    url: jdbc:postgresql://${LEDGER_DB_HOST:localhost}:${LEDGER_DB_PORT:5433}/${LEDGER_DB_NAME:ledger_db}
+    username: ${LEDGER_DB_USER:ledger_user}
+    password: ${LEDGER_DB_PASSWORD:ledger_pass}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    consumer:
+      group-id: risk-engine
+
+server:
+  port: 0
+
+tradinggate:
+  role: risk
+  topics:
+    trades-executed: trades.executed
+    risk-commands: risk.commands
+    clearing-settlement: clearing.settlement
+
+
+# ============================================
+#  Profile: clearing
+# ============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: clearing
+  datasource:
+    url: jdbc:postgresql://${LEDGER_DB_HOST:localhost}:${LEDGER_DB_PORT:5433}/${LEDGER_DB_NAME:ledger_db}
+    username: ${LEDGER_DB_USER:ledger_user}
+    password: ${LEDGER_DB_PASSWORD:ledger_pass}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    consumer:
+      group-id: clearing-engine
+
+server:
+  port: 0
+
+tradinggate:
+  role: clearing
+  topics:
+    trades-executed: trades.executed
+    clearing-settlement: clearing.settlement
+
+
+# ============================================
+#  Profile: projection
+# ============================================
+---
+spring:
+  config:
+    activate:
+      on-profile: projection
+  datasource:
+    url: jdbc:postgresql://${TRADING_DB_HOST:localhost}:${TRADING_DB_PORT:5432}/${TRADING_DB_NAME:trading_db}
+    username: ${TRADING_DB_USER:trading_user}
+    password: ${TRADING_DB_PASSWORD:trading_pass}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    consumer:
+      group-id: trading-projection
+
+server:
+  port: ${PROJECTION_PORT:8090}
+
+tradinggate:
+  role: projection
+  topics:
+    trades-executed: trades.executed
+    orders-updated: orders.updated
