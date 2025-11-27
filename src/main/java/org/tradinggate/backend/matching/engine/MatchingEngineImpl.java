@@ -3,6 +3,7 @@ package org.tradinggate.backend.matching.engine;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 import org.tradinggate.backend.matching.domain.*;
 import org.tradinggate.backend.matching.domain.e.OrderSide;
 import org.tradinggate.backend.matching.domain.e.OrderStatus;
@@ -12,11 +13,10 @@ import org.tradinggate.backend.matching.domain.e.TimeInForce;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.tradinggate.backend.matching.domain.e.CancelBy.CLIENT_ORDER_ID;
-import static org.tradinggate.backend.matching.domain.e.CancelBy.ORDER_ID;
-
+@Component
 @Getter
 @RequiredArgsConstructor(access = AccessLevel.PUBLIC)
 public class MatchingEngineImpl implements MatchingEngine {
@@ -108,6 +108,10 @@ public class MatchingEngineImpl implements MatchingEngine {
         long price = command.getPrice() != null ? command.getPrice().longValue() : 0L;
         long quantity = command.getQuantity() != null ? command.getQuantity().longValue() : 0L;
 
+        long receivedAtMillis = command.getReceivedAt() != null
+                ? command.getReceivedAt().toEpochMilli()
+                : currentTimeMillis;
+
         Order order = Order.createNew(
                 orderId,
                 accountId,
@@ -118,13 +122,21 @@ public class MatchingEngineImpl implements MatchingEngine {
                 command.getTimeInForce(),
                 price,
                 quantity,
+                receivedAtMillis,
                 currentTimeMillis
         );
 
         order.reject(preCheckReason.name(), currentTimeMillis);
         orderBook.indexNewOrder(order);
 
-        OrderUpdate update = OrderUpdate.of(order, null, preCheckReason.name(), "REJECTED", currentTimeMillis);
+        OrderUpdate update = OrderUpdate.of(
+                getOrderEventId(),
+                order,
+                null,
+                preCheckReason.name(),
+                "REJECTED",
+                currentTimeMillis
+        );
         result.addOrderUpdate(update);
 
         return result;
@@ -143,6 +155,10 @@ public class MatchingEngineImpl implements MatchingEngine {
         long price = toPriceLong(command.getPrice());
         long quantity = toQuantityLong(command.getQuantity());
 
+        long receivedAtMillis = command.getReceivedAt() != null
+                ? command.getReceivedAt().toEpochMilli()
+                : currentTimeMillis;
+
         Order order = Order.createNew(
                 orderId,
                 accountId,
@@ -153,11 +169,19 @@ public class MatchingEngineImpl implements MatchingEngine {
                 command.getTimeInForce(),
                 price,
                 quantity,
+                receivedAtMillis,
                 currentTimeMillis
         );
 
         orderBook.indexNewOrder(order);
-        OrderUpdate createUpdate = OrderUpdate.of(order, null, null, "CREATED", currentTimeMillis);
+        OrderUpdate createUpdate = OrderUpdate.of(
+                getOrderEventId(),
+                order,
+                null,
+                null,
+                "CREATED",
+                currentTimeMillis
+        );
         result.addOrderUpdate(createUpdate);
 
         return order;
@@ -208,10 +232,24 @@ public class MatchingEngineImpl implements MatchingEngine {
             MatchFill fill = MatchFill.of(matchId, symbol, execPrice, execQuantity, currentTimeMillis, taker, maker);
             result.addMatchFill(fill);
 
-            OrderUpdate takerUpdate = OrderUpdate.of(taker, takerPreviousStatus, null, "TRADE", currentTimeMillis);
+            OrderUpdate takerUpdate = OrderUpdate.of(
+                    getOrderEventId(),
+                    taker,
+                    takerPreviousStatus,
+                    null,
+                    "TRADE",
+                    currentTimeMillis
+            );
             result.addOrderUpdate(takerUpdate);
 
-            OrderUpdate makerUpdate = OrderUpdate.of(maker, makerPreviousStatus, null, "TRADE", currentTimeMillis);
+            OrderUpdate makerUpdate = OrderUpdate.of(
+                    getOrderEventId(),
+                    maker,
+                    makerPreviousStatus,
+                    null,
+                    "TRADE",
+                    currentTimeMillis
+            );
             result.addOrderUpdate(makerUpdate);
 
             if (!maker.hasRemaining()) orderBook.removeFromBook(maker);
@@ -239,6 +277,7 @@ public class MatchingEngineImpl implements MatchingEngine {
             taker.cancel("TIME_IN_FORCE_EXPIRED", currentTimeMillis);
 
             OrderUpdate tifCancelUpdate = OrderUpdate.of(
+                    getOrderEventId(),
                     taker,
                     previousStatus,
                     "TIME_IN_FORCE_EXPIRED",
@@ -346,6 +385,7 @@ public class MatchingEngineImpl implements MatchingEngine {
         targetOrder.cancel("USER_CANCEL", currentTimeMillis);
 
         OrderUpdate cancelUpdate = OrderUpdate.of(
+                getOrderEventId(),
                 targetOrder,
                 previousStatus,
                 "USER_CANCEL",
@@ -385,6 +425,10 @@ public class MatchingEngineImpl implements MatchingEngine {
         }
     }
 
+
+    private String getOrderEventId() {
+        return "orderEvent-" + UUID.randomUUID();
+    }
 
     // TODO: 향후 snapshot/복구를 위한 메서드 추가
     //  - exportSnapshot(symbol) : 오더북 상태, 인덱스 등 직렬화

@@ -31,6 +31,7 @@ public class Order {
     private OrderStatus status;
     private String rejectReason;
 
+    private long receivedAtMillis;
     private long createdAtMillis;
     private long updatedAtMillis;
     private int lastEventSeq;
@@ -45,6 +46,7 @@ public class Order {
             TimeInForce timeInForce,
             long price,
             long quantity,
+            long receivedAtMillis,
             long createdAtMillis
     ) {
         return Order.builder()
@@ -62,6 +64,7 @@ public class Order {
                 .avgFilledPrice(0L)
                 .status(OrderStatus.NEW)
                 .rejectReason(null)
+                .receivedAtMillis(receivedAtMillis)
                 .createdAtMillis(createdAtMillis)
                 .updatedAtMillis(createdAtMillis)
                 .lastEventSeq(0)

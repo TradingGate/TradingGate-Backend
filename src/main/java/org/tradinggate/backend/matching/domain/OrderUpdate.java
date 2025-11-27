@@ -6,16 +6,20 @@ import lombok.Builder;
 import lombok.Getter;
 import org.tradinggate.backend.matching.domain.e.*;
 
+import java.time.Instant;
+
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder(access = AccessLevel.PRIVATE)
 public class OrderUpdate {
 
+    private final String eventId;
     private final long orderId;
-    private final long accountId;
     private final String clientOrderId;
-    private final String symbol;
+    private final long accountId;
+    private final Instant receivedAt;
 
+    private final String symbol;
     private final OrderSide side;
     private final OrderType orderType;
     private final TimeInForce timeInForce;
@@ -30,11 +34,13 @@ public class OrderUpdate {
     private final OrderStatus newStatus;
     private final String reasonCode;
 
-    private final int eventSeq;
     private final String eventType;
+    private final int eventSeq;
+    private final Instant eventTime;
     private final long eventTimeMillis;
 
     public static OrderUpdate of(
+            String eventId,
             Order order,
             OrderStatus previousStatus,
             String reasonCode,
@@ -42,9 +48,12 @@ public class OrderUpdate {
             long eventTimeMillis
     ) {
         int seq = order.nextEventSeq();
+        Instant eventTime = Instant.ofEpochMilli(eventTimeMillis);
         return OrderUpdate.builder()
+                .eventId(eventId)
                 .orderId(order.getOrderId())
                 .accountId(order.getAccountId())
+                .receivedAt(Instant.ofEpochMilli(order.getReceivedAtMillis()))
                 .clientOrderId(order.getClientOrderId())
                 .symbol(order.getSymbol())
                 .side(order.getSide())
@@ -60,8 +69,8 @@ public class OrderUpdate {
                 .reasonCode(reasonCode)
                 .eventSeq(seq)
                 .eventType(eventType)
+                .eventTime(eventTime)
                 .eventTimeMillis(eventTimeMillis)
                 .build();
     }
 }
-
