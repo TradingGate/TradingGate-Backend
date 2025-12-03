@@ -22,6 +22,6 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 @Profile("api")
 public class ApiProfileConfig {
-
+  //check
   // TODO: API 전용 설정
 }
