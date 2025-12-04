@@ -1,4 +1,8 @@
 package org.tradinggate.backend.trading.domain.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.tradinggate.backend.trading.domain.entity.Order;
+
 /**
  * [A-1] Trading API - 주문 Repository
  *

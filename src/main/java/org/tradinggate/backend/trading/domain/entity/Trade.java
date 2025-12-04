@@ -38,13 +38,13 @@ import jakarta.persistence.Entity;
  *
  * 참고: PDF 3 (trading_trade 테이블 구조)
  */
-@Entity
-@Table(name = "trading_trade")
-public class Trade {
-
-  // TODO: 필드 정의
-
-  // TODO: JPA 어노테이션
-
-  // TODO: Getter/Setter
-}
+//@Entity
+//@Table(name = "trading_trade")
+//public class Trade {
+//
+//  // TODO: 필드 정의
+//
+//  // TODO: JPA 어노테이션
+//
+//  // TODO: Getter/Setter
+//}

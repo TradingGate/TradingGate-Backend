@@ -16,7 +16,7 @@ package org.tradinggate.backend.trading.domain.repository;
  * 참고: PDF 3 (trading_trade 테이블)
  */
 
-public interface TradeRepository extends JpaRepository<Trade, Long> {
-
-  // TODO: 조회 메서드 정의
-}
+//public interface TradeRepository extends JpaRepository<Trade, Long> {
+//
+//  // TODO: 조회 메서드 정의
+//}

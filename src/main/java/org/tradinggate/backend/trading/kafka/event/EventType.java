@@ -7,7 +7,7 @@ package org.tradinggate.backend.trading.kafka.event;
  * - 이벤트 타입 상수 정의
  *
  * TODO:
- * [ ] Enum 값 정의:
+ * [✅️] Enum 값 정의:
  *     - NEW (신규 주문)
  *     - CANCEL (주문 취소)
  *     - CREATED (주문 생성됨)
@@ -20,5 +20,5 @@ package org.tradinggate.backend.trading.kafka.event;
  * 참고: PDF 1-2 (orders.updated eventType)
  */
 public enum EventType {
-  // TODO: Enum 값 정의
+  NEW, CANCEL, CREATED, STATUS_CHANGED, CANCELED, REJECTED, TRADE_MATCHED, EXPIRED
 }

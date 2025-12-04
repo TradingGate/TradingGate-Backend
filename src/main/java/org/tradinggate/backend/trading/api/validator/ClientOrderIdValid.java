@@ -26,9 +26,9 @@ import java.lang.annotation.Target; /**
  *
  * 참고: PDF 1 (trading_order.client_order_id VARCHAR(64))
  */
-@Target({ElementType.FIELD, ElementType.PARAMETER})
-@Retention(RetentionPolicy.RUNTIME)
-@Constraint(validatedBy = ClientOrderIdValidator.class)
-public @interface ClientOrderIdValid {
-  // TODO: 어노테이션 정의
-}
+//@Target({ElementType.FIELD, ElementType.PARAMETER})
+//@Retention(RetentionPolicy.RUNTIME)
+//@Constraint(validatedBy = ClientOrderIdValidator.class)
+//public @interface ClientOrderIdValid {
+//  // TODO: 어노테이션 정의
+//}
