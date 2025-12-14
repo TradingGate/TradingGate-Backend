@@ -1,93 +1,76 @@
 package org.tradinggate.backend.trading.kafka.producer;
 
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
-import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
-import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
+import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.kafka.event.OrderCancelEvent;
 import org.tradinggate.backend.trading.kafka.event.OrderEvent;
 
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-
 /**
- * [A-1] Trading API - Kafka 이벤트 발행
- * 역할:
- * - orders.in 토픽에 주문/취소 이벤트 발행
- * - ⚠️ key = symbol (같은 심볼은 같은 파티션으로) ⚠️
- * TODO:
- * [✅️] publishNewOrder(OrderCreateRequest, Long userId) 구현:
- *     1. OrderCreateRequest → OrderEvent 변환
- *        - commandType = "NEW"
- *        - source = "API"
- *        - receivedAt = 현재 시각 (ISO 8601)
- *     2. Kafka Send:
- *        - Topic: "orders.in"
- *        - Key: request.getSymbol()
- *        - Value: OrderEvent (JSON)
- *     3. 비동기 전송 + CompletableFuture 콜백:
- *        - 성공: 로그 기록
- *        - 실패: 로그 + 예외 처리 (재시도 3회)
- * [ ] publishCancelOrder(OrderCancelRequest, Long userId) 구현:
- *     1. OrderCancelRequest → OrderCancelEvent 변환
- *        - commandType = "CANCEL"
- *        - cancelTarget 설정
- *     2. Kafka Send (동일 방식)
- * [ ] 재시도 정책: 3회 재시도, 지수 백오프
- * [ ] 에러 처리:
- *     - KafkaException 발생 시 로그 + 알림
- * 참고: PDF 1-1 (orders.in 이벤트 구조)
+ * 주문 이벤트 발행자 (PDF 기준)
+ * - orders.in: 신규 주문, 주문 취소 (commandType으로 구분)
  */
-
-@Slf4j
 @Component
-@Profile("api")
 @RequiredArgsConstructor
+@Log4j2
 public class OrderEventProducer {
 
-  private final KafkaTemplate<String, Object> kafkaTemplate;
-  private static final String TOPIC = "orders.in";
+  private final KafkaTemplate<String, String> kafkaTemplate;
+  private final ObjectMapper objectMapper;
 
-  /**신규 주문 이벤트 발행*/
-  public void publishNewOrder(OrderCreateRequest request, Long userId) {
-    OrderEvent event = OrderEvent.builder()
-        .commandType("NEW")
-        .userId(userId)
-        .clientOrderId(request.getClientOrderId())
-        .symbol(request.getSymbol())
-        .side(request.getSide().name())
-        .orderType(request.getOrderType().name())
-        .timeInForce(request.getTimeInForce().name())
-        .price(request.getPrice())
-        .quantity(request.getQuantity())
-        .source("API")
-        .receivedAt(ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT))
-        .build();
+  // ✅ PDF 스키마: orders.in 토픽 하나로 통일
+  private static final String ORDERS_IN_TOPIC = "orders.in";
 
-    kafkaTemplate.send(TOPIC, request.getSymbol(), event);
-    log.info("Published NEW order: clientOrderId={}, symbol={}", request.getClientOrderId(), request.getSymbol());
+  /**
+   * 신규 주문 이벤트 발행 (commandType: NEW)
+   */
+  public void publishNewOrder(Order order) {
+    try {
+      OrderEvent event = OrderEvent.from(order);
+      String message = objectMapper.writeValueAsString(event);
+
+      // symbol 기준 파티셔닝
+      kafkaTemplate.send(ORDERS_IN_TOPIC, event.getPartitionKey(), message)
+          .whenComplete((result, ex) -> {
+            if (ex != null) {
+              log.error("주문 이벤트 발행 실패: clientOrderId={}, error={}",
+                  order.getClientOrderId(), ex.getMessage(), ex);
+            } else {
+              log.info("주문 이벤트 발행 성공: clientOrderId={}, partition={}, commandType=NEW",
+                  order.getClientOrderId(), result.getRecordMetadata().partition());
+            }
+          });
+    } catch (Exception e) {
+      log.error("주문 이벤트 직렬화 실패: clientOrderId={}", order.getClientOrderId(), e);
+      throw new RuntimeException("Kafka 이벤트 발행 실패", e);
+    }
   }
 
-  /**주문 취소 이벤트 발행*/
-  public void publishCancelOrder(OrderCancelRequest request, Long userId) {
-    OrderCancelEvent event = OrderCancelEvent.builder()
-        .commandType("CANCEL")
-        .userId(userId)
-        .clientOrderId(request.getClientOrderId())
-        .symbol(request.getSymbol())
-        .cancelTarget(OrderCancelEvent.CancelTarget.builder()
-            .by("CLIENT_ORDER_ID")
-            .value(request.getClientOrderId())
-            .build())
-        .source("API")
-        .receivedAt(ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT))
-        .build();
+  /**
+   * 주문 취소 이벤트 발행 (commandType: CANCEL)
+   */
+  public void publishCancelOrder(Order order) {
+    try {
+      OrderCancelEvent event = OrderCancelEvent.from(order);
+      String message = objectMapper.writeValueAsString(event);
 
-    kafkaTemplate.send(TOPIC, request.getSymbol(), event);
-    log.info("Published CANCEL order: clientOrderId={}, symbol={}", request.getClientOrderId(), request.getSymbol());
+      // symbol 기준 파티셔닝
+      kafkaTemplate.send(ORDERS_IN_TOPIC, event.getPartitionKey(), message)
+          .whenComplete((result, ex) -> {
+            if (ex != null) {
+              log.error("주문 취소 이벤트 발행 실패: clientOrderId={}, error={}",
+                  order.getClientOrderId(), ex.getMessage(), ex);
+            } else {
+              log.info("주문 취소 이벤트 발행 성공: clientOrderId={}, partition={}, commandType=CANCEL",
+                  order.getClientOrderId(), result.getRecordMetadata().partition());
+            }
+          });
+    } catch (Exception e) {
+      log.error("주문 취소 이벤트 직렬화 실패: clientOrderId={}", order.getClientOrderId(), e);
+      throw new RuntimeException("Kafka 이벤트 발행 실패", e);
+    }
   }
 }

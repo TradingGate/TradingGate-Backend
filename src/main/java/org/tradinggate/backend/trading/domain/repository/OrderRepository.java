@@ -28,12 +28,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
   List<Order> findByUserIdAndCreatedAtBetween(
       Long userId,
       LocalDateTime startDate,
-      LocalDateTime endDate
-  );
+      LocalDateTime endDate);
 
   @Query("SELECT o FROM Order o WHERE o.userId = :userId AND o.status = 'PENDING' ORDER BY o.createdAt DESC")
   List<Order> findPendingOrders(@Param("userId") Long userId);
 
   @Query("SELECT COUNT(o) FROM Order o WHERE o.userId = :userId AND o.symbol = :symbol AND o.status = 'PENDING'")
   long countPendingOrdersBySymbol(@Param("userId") Long userId, @Param("symbol") String symbol);
+
+  Optional<Order> findByUserIdAndClientOrderId(Long userId, String clientOrderId);
 }

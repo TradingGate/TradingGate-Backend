@@ -11,8 +11,10 @@ import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.domain.entity.OrderSide;
 import org.tradinggate.backend.trading.domain.entity.OrderType;
 import org.tradinggate.backend.trading.domain.entity.TimeInForce;
+import org.tradinggate.backend.trading.domain.repository.OrderRepository;
 import org.tradinggate.backend.trading.exception.DuplicateOrderException;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
+import org.tradinggate.backend.trading.api.validator.OrderValidator;
 
 import java.math.BigDecimal;
 
@@ -28,116 +30,150 @@ import static org.mockito.Mockito.*;
 @DisplayName("주문 서비스 테스트")
 class OrderServiceTest {
 
-  @Mock  // ✅ @MockBean → @Mock으로 변경
-  private IdempotencyService idempotencyService;
+    @Mock // ✅ @MockBean → @Mock으로 변경
+    private IdempotencyService idempotencyService;
 
-  @Mock  // ✅ @MockBean → @Mock으로 변경
-  private OrderEventProducer orderEventProducer;
+    @Mock // ✅ @MockBean → @Mock으로 변경
+    private OrderEventProducer orderEventProducer;
 
-  @InjectMocks
-  private OrderService orderService;
+    @Mock
+    private RiskCheckService riskCheckService;
 
-  @Test
-  @DisplayName("신규 주문 생성 - 성공")
-  void createOrder_Success() {
-    // given
-    Long userId = 1L;
-    OrderCreateRequest request = OrderCreateRequest.builder()
-        .clientOrderId("cli-20241204-0001")
-        .symbol("BTCUSDT")
-        .side(OrderSide.BUY)
-        .orderType(OrderType.LIMIT)
-        .timeInForce(TimeInForce.GTC)
-        .price(new BigDecimal("50000.00"))
-        .quantity(new BigDecimal("0.1"))
-        .build();
+    @Mock
+    private OrderValidator orderValidator;
 
-    doNothing().when(idempotencyService).checkAndLock(anyLong(), anyString());
-    doNothing().when(orderEventProducer).publishNewOrder(any(), anyLong());
+    @Mock
+    private OrderRepository orderRepository;
 
-    // when
-    OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
+    @InjectMocks
+    private OrderService orderService;
 
-    // then
-    assertNotNull(response);
-    assertEquals("cli-20241204-0001", response.getClientOrderId());
-    assertTrue(response.getReceived());
+    @Test
+    @DisplayName("신규 주문 생성 - 성공")
+    void createOrder_Success() {
+        // given
+        Long userId = 1L;
+        OrderCreateRequest request = OrderCreateRequest.builder()
+                .clientOrderId("cli-20241204-0001")
+                .symbol("BTCUSDT")
+                .side(OrderSide.BUY)
+                .orderType(OrderType.LIMIT)
+                .timeInForce(TimeInForce.GTC)
+                .price(new BigDecimal("50000.00"))
+                .quantity(new BigDecimal("0.1"))
+                .build();
 
-    verify(idempotencyService).checkAndLock(userId, "cli-20241204-0001");
-    verify(orderEventProducer).publishNewOrder(request, userId);
-  }
+        when(riskCheckService.isBlocked(anyLong(), anyString())).thenReturn(false);
+        doNothing().when(idempotencyService).checkAndLock(anyLong(), anyString());
 
-  @Test
-  @DisplayName("중복 주문 - 멱등성 체크 실패")
-  void createOrder_DuplicateOrder_ThrowsException() {
-    // given
-    Long userId = 1L;
-    OrderCreateRequest request = OrderCreateRequest.builder()
-        .clientOrderId("cli-20241204-0001")
-        .symbol("BTCUSDT")
-        .side(OrderSide.BUY)
-        .orderType(OrderType.LIMIT)
-        .timeInForce(TimeInForce.GTC)
-        .price(new BigDecimal("50000.00"))
-        .quantity(new BigDecimal("0.1"))
-        .build();
+        // Order.
+        doNothing().when(orderEventProducer)
+                .publishNewOrder(any(org.tradinggate.backend.trading.domain.entity.Order.class));
 
-    doThrow(new DuplicateOrderException("Duplicate order"))
-        .when(idempotencyService).checkAndLock(anyLong(), anyString());
+        // when
+        OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
 
-    // when & then
-    assertThrows(DuplicateOrderException.class,
-        () -> orderService.createOrder(request, userId));
+        // then
+        assertNotNull(response);
+        assertEquals("cli-20241204-0001", response.getClientOrderId());
+        assertTrue(response.getReceived());
 
-    verify(orderEventProducer, never()).publishNewOrder(any(), anyLong());
-  }
+        verify(riskCheckService).isBlocked(userId, "BTCUSDT");
+        verify(orderValidator).validate(request);
+        verify(idempotencyService).checkAndLock(userId, "cli-20241204-0001");
+        verify(orderEventProducer).publishNewOrder(any(org.tradinggate.backend.trading.domain.entity.Order.class));
+    }
 
-  @Test
-  @DisplayName("주문 생성 중 예외 발생 - 멱등성 키 삭제")
-  void createOrder_KafkaFails_ReleasesIdempotencyLock() {
-    // given
-    Long userId = 1L;
-    OrderCreateRequest request = OrderCreateRequest.builder()
-        .clientOrderId("cli-20241204-0001")
-        .symbol("BTCUSDT")
-        .side(OrderSide.BUY)
-        .orderType(OrderType.LIMIT)
-        .timeInForce(TimeInForce.GTC)
-        .price(new BigDecimal("50000.00"))
-        .quantity(new BigDecimal("0.1"))
-        .build();
+    @Test
+    @DisplayName("중복 주문 - 멱등성 체크 실패")
+    void createOrder_DuplicateOrder_ThrowsException() {
+        // given
+        Long userId = 1L;
+        OrderCreateRequest request = OrderCreateRequest.builder()
+                .clientOrderId("cli-20241204-0001")
+                .symbol("BTCUSDT")
+                .side(OrderSide.BUY)
+                .orderType(OrderType.LIMIT)
+                .timeInForce(TimeInForce.GTC)
+                .price(new BigDecimal("50000.00"))
+                .quantity(new BigDecimal("0.1"))
+                .build();
 
-    doNothing().when(idempotencyService).checkAndLock(anyLong(), anyString());
-    doThrow(new RuntimeException("Kafka error"))
-        .when(orderEventProducer).publishNewOrder(any(), anyLong());
+        when(riskCheckService.isBlocked(anyLong(), anyString())).thenReturn(false);
+        doThrow(new DuplicateOrderException("Duplicate order"))
+                .when(idempotencyService).checkAndLock(anyLong(), anyString());
 
-    // when & then
-    assertThrows(RuntimeException.class,
-        () -> orderService.createOrder(request, userId));
+        // when & then
+        assertThrows(DuplicateOrderException.class,
+                () -> orderService.createOrder(request, userId));
 
-    verify(idempotencyService).markFailed(userId, "cli-20241204-0001");
-  }
+        verify(orderEventProducer, never())
+                .publishNewOrder(any(org.tradinggate.backend.trading.domain.entity.Order.class));
+    }
 
-  @Test
-  @DisplayName("주문 취소 - 성공")
-  void cancelOrder_Success() {
-    // given
-    Long userId = 1L;
-    OrderCancelRequest request = OrderCancelRequest.builder()
-        .clientOrderId("cli-20241204-0001")
-        .symbol("BTCUSDT")
-        .build();
+    @Test
+    @DisplayName("주문 생성 중 예외 발생 - 멱등성 키 삭제")
+    void createOrder_KafkaFails_ReleasesIdempotencyLock() {
+        // given
+        Long userId = 1L;
+        OrderCreateRequest request = OrderCreateRequest.builder()
+                .clientOrderId("cli-20241204-0001")
+                .symbol("BTCUSDT")
+                .side(OrderSide.BUY)
+                .orderType(OrderType.LIMIT)
+                .timeInForce(TimeInForce.GTC)
+                .price(new BigDecimal("50000.00"))
+                .quantity(new BigDecimal("0.1"))
+                .build();
 
-    doNothing().when(orderEventProducer).publishCancelOrder(any(), anyLong());
+        when(riskCheckService.isBlocked(anyLong(), anyString())).thenReturn(false);
+        doNothing().when(idempotencyService).checkAndLock(anyLong(), anyString());
+        // Since we pass an order object, match any Order
+        doThrow(new RuntimeException("Kafka error"))
+                .when(orderEventProducer)
+                .publishNewOrder(any(org.tradinggate.backend.trading.domain.entity.Order.class));
 
-    // when
-    OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
+        // when & then
+        assertThrows(RuntimeException.class,
+                () -> orderService.createOrder(request, userId));
 
-    // then
-    assertNotNull(response);
-    assertEquals("cli-20241204-0001", response.getClientOrderId());
-    assertTrue(response.getReceived());
+        verify(idempotencyService).markFailed(userId, "cli-20241204-0001");
+    }
 
-    verify(orderEventProducer).publishCancelOrder(request, userId);
-  }
+    @Test
+    @DisplayName("주문 취소 - 성공")
+    void cancelOrder_Success() {
+        // given
+        Long userId = 1L;
+        OrderCancelRequest request = OrderCancelRequest.builder()
+                .clientOrderId("cli-20241204-0001")
+                .symbol("BTCUSDT")
+                .build();
+
+        org.tradinggate.backend.trading.domain.entity.Order mockOrder = org.tradinggate.backend.trading.domain.entity.Order
+                .create(
+                        userId,
+                        "cli-20241204-0001",
+                        "BTCUSDT",
+                        OrderSide.BUY,
+                        OrderType.LIMIT,
+                        TimeInForce.GTC,
+                        BigDecimal.TEN,
+                        BigDecimal.ONE);
+
+        when(orderRepository.findByUserIdAndClientOrderId(anyLong(), anyString()))
+                .thenReturn(java.util.Optional.of(mockOrder));
+        doNothing().when(orderEventProducer)
+                .publishCancelOrder(any(org.tradinggate.backend.trading.domain.entity.Order.class));
+
+        // when
+        OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
+
+        // then
+        assertNotNull(response);
+        assertEquals("cli-20241204-0001", response.getClientOrderId());
+        assertTrue(response.getReceived());
+
+        verify(orderEventProducer).publishCancelOrder(mockOrder);
+    }
 }

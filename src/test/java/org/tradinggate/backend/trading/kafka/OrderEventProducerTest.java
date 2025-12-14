@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
+import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.OrderSide;
 import org.tradinggate.backend.trading.domain.entity.OrderType;
 import org.tradinggate.backend.trading.domain.entity.TimeInForce;
@@ -52,7 +53,16 @@ class OrderEventProducerTest {
         .build();
 
     // when
-    orderEventProducer.publishNewOrder(request, userId);
+    Order order = Order.create(
+        userId,
+        request.getClientOrderId(),
+        request.getSymbol(),
+        request.getSide(),
+        request.getOrderType(),
+        request.getTimeInForce(),
+        request.getPrice(),
+        request.getQuantity());
+    orderEventProducer.publishNewOrder(order);
 
     // then
     ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
@@ -62,7 +72,7 @@ class OrderEventProducerTest {
     verify(kafkaTemplate).send(topicCaptor.capture(), keyCaptor.capture(), eventCaptor.capture());
 
     assertEquals("orders.in", topicCaptor.getValue());
-    assertEquals("BTCUSDT", keyCaptor.getValue());  // key = symbol
+    assertEquals("BTCUSDT", keyCaptor.getValue()); // key = symbol
 
     OrderEvent event = eventCaptor.getValue();
     assertEquals("NEW", event.getCommandType());
@@ -83,8 +93,18 @@ class OrderEventProducerTest {
         .symbol("BTCUSDT")
         .build();
 
+    Order order = Order.create(
+        userId,
+        "cli-20241204-0001",
+        "BTCUSDT",
+        OrderSide.BUY,
+        OrderType.LIMIT,
+        TimeInForce.GTC,
+        BigDecimal.TEN,
+        BigDecimal.ONE);
+
     // when
-    orderEventProducer.publishCancelOrder(request, userId);
+    orderEventProducer.publishCancelOrder(order);
 
     // then
     ArgumentCaptor<OrderCancelEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelEvent.class);

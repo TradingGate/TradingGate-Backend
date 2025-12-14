@@ -8,7 +8,6 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.exception.CustomException;
-import org.tradinggate.backend.global.exception.DomainErrorCode;
 import org.tradinggate.backend.global.exception.UserErrorCode;
 import org.tradinggate.backend.trading.api.dto.response.OrderResponse;
 import org.tradinggate.backend.trading.domain.entity.Order;
@@ -22,27 +21,23 @@ import java.util.stream.Collectors;
 
 /**
  * [A-1] Trading API - 주문 조회 서비스
- *
  * 역할:
  * - Trading DB에서 주문 정보 읽기
  * - Read-Only 작업
- *
  * TODO:
  * [ ] getOrders(OrderQueryRequest, Pageable) - 조건별 주문 목록 조회
  *     - OrderRepository.findByUserIdAndSymbol() 등 활용
  *     - Pagination 처리
  *     - OrderResponse 리스트 반환
- *
  * [ ] getOrderById(Long orderId) - 단일 주문 조회
  *     - OrderRepository.findByOrderId()
  *     - 없으면 OrderNotFoundException
- *
  * [ ] getOrderByClientOrderId(Long userId, String clientOrderId)
  *     - 멱등성 체크용 조회
  *     - OrderRepository.findByUserIdAndClientOrderId()
- *
  * 참고: PDF 2-4 (Projection Consumer → Trading DB)
- */
+ **/
+
 /**
  * 주문 조회 전용 서비스 (CQRS Query)
  * - @Transactional(readOnly = true) 로 읽기 최적화
@@ -109,11 +104,9 @@ public class OrderQueryService {
   public List<OrderResponse> getOrdersByDateRange(
       Long userId,
       LocalDateTime startDate,
-      LocalDateTime endDate
-  ) {
+      LocalDateTime endDate) {
     List<Order> orders = orderRepository.findByUserIdAndCreatedAtBetween(
-        userId, startDate, endDate
-    );
+        userId, startDate, endDate);
     return orders.stream()
         .map(OrderResponse::from)
         .collect(Collectors.toList());
@@ -123,7 +116,7 @@ public class OrderQueryService {
    * 미체결 주문 조회
    */
   public List<OrderResponse> getPendingOrders(Long userId) {
-    return getOrdersByStatus(userId, OrderStatus.PENDING);
+    return getOrdersByStatus(userId, OrderStatus.NEW);
   }
 
   /**

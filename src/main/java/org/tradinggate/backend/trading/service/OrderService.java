@@ -40,8 +40,18 @@ public class OrderService {
     idempotencyService.checkAndLock(userId, request.getClientOrderId());
 
     try {
-      // 4. Kafka orders.in 발행
-      orderEventProducer.publishNewOrder(request, userId);
+      // 4. Kafka orders.in 발행 (Order 객체 생성만 하고 저장하지 않음)
+      Order order = Order.create(
+          userId,
+          request.getClientOrderId(),
+          request.getSymbol(),
+          request.getSide(),
+          request.getOrderType(),
+          request.getTimeInForce(),
+          request.getPrice(),
+          request.getQuantity());
+
+      orderEventProducer.publishNewOrder(order);
 
       // 5. 응답 반환
       return OrderCreateResponse.builder()
@@ -76,7 +86,7 @@ public class OrderService {
     }
 
     // 3. Kafka orders.in 취소 이벤트 발행
-    orderEventProducer.publishCancelOrder(request, userId);
+    orderEventProducer.publishCancelOrder(order);
 
     return OrderCancelResponse.builder()
         .clientOrderId(request.getClientOrderId())

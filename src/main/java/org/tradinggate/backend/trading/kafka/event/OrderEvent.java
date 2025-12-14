@@ -1,39 +1,36 @@
+// org/tradinggate/backend/trading/kafka/event/OrderEvent.java
 package org.tradinggate.backend.trading.kafka.event;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.tradinggate.backend.trading.domain.entity.Order;
+import org.tradinggate.backend.trading.domain.entity.OrderSide;
+import org.tradinggate.backend.trading.domain.entity.OrderType;
+import org.tradinggate.backend.trading.domain.entity.TimeInForce;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
- * [A-1] Trading API - 신규 주문 이벤트
- * 역할:
- * - orders.in 토픽에 발행할 이벤트 구조
- * - Matching Worker(A-2)가 소비
- * TODO:
- * [✅️] PDF 스키마에 맞춰 필드 정의:
- *     - String commandType = "NEW"
- *     - Long userId
- *     - String clientOrderId
- *     - String symbol
- *     - String side ("BUY" / "SELL")
- *     - String orderType ("LIMIT" / "MARKET")
- *     - String timeInForce ("GTC" / "IOC" / "FOK") ✅
- *     - BigDecimal price
- *     - BigDecimal quantity
- *     - String source ("API" / "SYSTEM" / "RISK")
- *     - String receivedAt (ISO 8601: "2025-11-17T12:34:56.789Z")
- * [ ] JSON 직렬화 어노테이션 (@JsonProperty)
- * [✅️] Getter/Setter 또는 @Data
+ * orders.in 토픽 - 신규 주문 이벤트 (PDF 스키마 기준)
  *
+ * 토픽: orders.in
+ * 파티션 키: symbol
+ * 목적지: Matching Engine (A-2)
+ *
+ * PDF 스키마:
+ * - commandType: "NEW"
+ * - userId, clientOrderId, symbol, side, orderType, timeInForce, price, quantity
+ * - source: "API"
+ * - receivedAt: 수신 시각
  */
-@Data
+@Getter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class OrderEvent {
 
   @JsonProperty("commandType")
@@ -49,13 +46,13 @@ public class OrderEvent {
   private String symbol;
 
   @JsonProperty("side")
-  private String side;  // "BUY" or "SELL"
+  private OrderSide side;
 
   @JsonProperty("orderType")
-  private String orderType;  // "LIMIT" or "MARKET"
+  private OrderType orderType;
 
   @JsonProperty("timeInForce")
-  private String timeInForce;  // "GTC", "IOC", "FOK"
+  private TimeInForce timeInForce;
 
   @JsonProperty("price")
   private BigDecimal price;
@@ -64,8 +61,34 @@ public class OrderEvent {
   private BigDecimal quantity;
 
   @JsonProperty("source")
-  private String source;  // "API", "SYSTEM", "RISK"
+  private String source;  // "API"
 
   @JsonProperty("receivedAt")
-  private String receivedAt;  // ISO 8601 타임스탬프
+  private LocalDateTime receivedAt;
+
+  /**
+   * Order Entity -> OrderEvent 변환 (PDF 스키마)
+   */
+  public static OrderEvent from(Order order) {
+    return OrderEvent.builder()
+        .commandType("NEW")
+        .userId(order.getUserId())
+        .clientOrderId(order.getClientOrderId())
+        .symbol(order.getSymbol())
+        .side(order.getOrderSide())
+        .orderType(order.getOrderType())
+        .timeInForce(order.getTimeInForce())
+        .price(order.getPrice())
+        .quantity(order.getQuantity())
+        .source("API")
+        .receivedAt(LocalDateTime.now())
+        .build();
+  }
+
+  /**
+   * Kafka 파티션 키 추출 (심볼 기준 파티셔닝)
+   */
+  public String getPartitionKey() {
+    return this.symbol;
+  }
 }

@@ -50,7 +50,7 @@ public class OrderValidator {
     if (request.getSymbol() == null || request.getSymbol().isBlank()) {
       throw new CustomException(DomainErrorCode.INVALID_PARAM);
     }
-    if (request.getType() == null) {
+    if (request.getOrderType() == null) {
       throw new CustomException(DomainErrorCode.INVALID_PARAM);
     }
     if (request.getSide() == null) {
@@ -59,7 +59,7 @@ public class OrderValidator {
   }
 
   private void validatePriceAndQuantity(OrderCreateRequest request) {
-    if (request.getType() == OrderType.LIMIT) {
+    if (request.getOrderType() == OrderType.LIMIT) {
       if (request.getPrice() == null || request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
         throw new CustomException(DomainErrorCode.INVALID_PARAM);
       }

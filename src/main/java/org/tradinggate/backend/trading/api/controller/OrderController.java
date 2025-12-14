@@ -24,19 +24,19 @@ import org.tradinggate.backend.trading.service.OrderService;
  * - HTTP 202 Accepted 응답 반환
  * TODO:
  * [🔼] POST /api/orders - 신규 주문 엔드포인트 구현
- *     - Request Body: OrderCreateRequest 받기✅
- *     - 인증 정보에서 userId 추출
- *     - OrderService.createOrder() 호출 ✅
- *     - HTTP 202 + clientOrderId 반환
+ * - Request Body: OrderCreateRequest 받기✅
+ * - 인증 정보에서 userId 추출
+ * - OrderService.createOrder() 호출 ✅
+ * - HTTP 202 + clientOrderId 반환
  * [✅️] POST /api/orders/cancel - 주문 취소 엔드포인트 구현
- *     - Request Body: OrderCancelRequest 받기 ✅
- *     - OrderService.cancelOrder() 호출 ✅
- *     - HTTP 202 응답
+ * - Request Body: OrderCancelRequest 받기 ✅
+ * - OrderService.cancelOrder() 호출 ✅
+ * - HTTP 202 응답
  * [ ] 예외 처리 추가
- *     - DuplicateOrderException -> 409 Conflict
- *     - RiskBlockedException -> 403 Forbidden
- *     - InvalidOrderException -> 400 Bad Request
- *     - OrderNotFoundException -> 404 Not Found
+ * - DuplicateOrderException -> 409 Conflict
+ * - RiskBlockedException -> 403 Forbidden
+ * - InvalidOrderException -> 400 Bad Request
+ * - OrderNotFoundException -> 404 Not Found
  * [✅️] @Profile("api") 어노테이션 확인
  * 참고: PDF 2-1, 2-2 (HTTP 요청 플로우)
  */
@@ -48,37 +48,36 @@ import org.tradinggate.backend.trading.service.OrderService;
 @Validated
 public class OrderController {
 
-  private final OrderService orderService;
+    private final OrderService orderService;
 
-  /**신규 주문 생성*/
-  @PostMapping
-  public ResponseEntity<OrderService.OrderCreateResponse> createOrder(
-      @Valid @RequestBody OrderCreateRequest request,
-      @AuthenticationPrincipal Long userId  // TODO: 실제 인증에서 userId 추출
-  ) {
-    log.info("Received order creation request: userId={}, clientOrderId={}",
-        userId, request.getClientOrderId());
+    /** 신규 주문 생성 */
+    @PostMapping
+    public ResponseEntity<OrderService.OrderCreateResponse> createOrder(
+            @Valid @RequestBody OrderCreateRequest request,
+            @AuthenticationPrincipal Long userId // TODO: 실제 인증에서 userId 추출
+    ) {
+        log.info("Received order creation request: userId={}, clientOrderId={}",
+                userId, request.getClientOrderId());
 
-    OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
+        OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
 
-    return ResponseEntity
-        .status(HttpStatus.ACCEPTED)  // 202
-        .body(response);
-  }
+        return ResponseEntity
+                .status(HttpStatus.ACCEPTED) // 202
+                .body(response);
+    }
 
-  /**주문 취소*/
-  @PostMapping("/cancel")
-  public ResponseEntity<OrderService.OrderCancelResponse> cancelOrder(
-      @Valid @RequestBody OrderCancelRequest request,
-      @AuthenticationPrincipal Long userId
-  ) {
-    log.info("Received order cancel request: userId={}, clientOrderId={}",
-        userId, request.getClientOrderId());
+    /** 주문 취소 */
+    @PostMapping("/cancel")
+    public ResponseEntity<OrderService.OrderCancelResponse> cancelOrder(
+            @Valid @RequestBody OrderCancelRequest request,
+            @AuthenticationPrincipal Long userId) {
+        log.info("Received order cancel request: userId={}, clientOrderId={}",
+                userId, request.getClientOrderId());
 
-    OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
+        OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
 
-    return ResponseEntity
-        .status(HttpStatus.ACCEPTED)  // 202
-        .body(response);
-  }
+        return ResponseEntity
+                .status(HttpStatus.ACCEPTED) // 202
+                .body(response);
+    }
 }

@@ -40,7 +40,7 @@ class IdempotencyServiceTest {
     String clientOrderId = "cli-20241204-0001";
 
     when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-    when(valueOperations.setIfAbsent(anyString(), eq("PENDING"), any(Duration.class)))
+    when(valueOperations.setIfAbsent(anyString(), eq("NEW"), any(Duration.class)))
         .thenReturn(true);
 
     // when & then
@@ -48,9 +48,8 @@ class IdempotencyServiceTest {
 
     verify(valueOperations).setIfAbsent(
         eq("order:idempotency:1:cli-20241204-0001"),
-        eq("PENDING"),
-        eq(Duration.ofMinutes(30))
-    );
+        eq("NEW"),
+        eq(Duration.ofMinutes(30)));
   }
 
   @Test
@@ -61,17 +60,16 @@ class IdempotencyServiceTest {
     String clientOrderId = "cli-20241204-0001";
 
     when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-    when(valueOperations.setIfAbsent(anyString(), eq("PENDING"), any(Duration.class)))
+    when(valueOperations.setIfAbsent(anyString(), eq("NEW"), any(Duration.class)))
         .thenReturn(false);
 
     // when & then
     DuplicateOrderException exception = assertThrows(
         DuplicateOrderException.class,
-        () -> idempotencyService.checkAndLock(userId, clientOrderId)
-    );
+        () -> idempotencyService.checkAndLock(userId, clientOrderId));
 
     assertTrue(exception.getMessage().contains("already exists"));
-    verify(valueOperations).setIfAbsent(anyString(), eq("PENDING"), any(Duration.class));
+    verify(valueOperations).setIfAbsent(anyString(), eq("NEW"), any(Duration.class));
   }
 
   @Test
@@ -89,6 +87,6 @@ class IdempotencyServiceTest {
 
     // then
     verify(redisTemplate, times(1)).delete(expectedKey);
-    verifyNoMoreInteractions(redisTemplate);  // ✅ 추가 - 다른 호출 없음 확인
+    verifyNoMoreInteractions(redisTemplate); // ✅ 추가 - 다른 호출 없음 확인
   }
 }

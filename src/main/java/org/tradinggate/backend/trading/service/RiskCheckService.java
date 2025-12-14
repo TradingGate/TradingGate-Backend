@@ -9,6 +9,7 @@ import org.tradinggate.backend.trading.exception.RiskBlockedException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+
 /**
  * 리스크 차단 체크 서비스
  * - Redis 기반 실시간 리스크 모니터링
@@ -42,6 +43,14 @@ public class RiskCheckService {
     }
 
     return false;
+  }
+
+  /**
+   * 사용자가 특정 심볼에 대해 리스크 차단되었는지 확인
+   */
+  public boolean isBlocked(Long userId, String symbol) {
+    // 현재는 심볼별 차단 로직이 없으므로 사용자 레벨 차단만 확인
+    return isBlocked(userId);
   }
 
   /**

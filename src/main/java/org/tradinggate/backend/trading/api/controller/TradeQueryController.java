@@ -1,7 +1,6 @@
 package org.tradinggate.backend.trading.api.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -22,9 +21,9 @@ import java.util.List;
  *
  * TODO:
  * [ ] GET /api/trades - 체결 목록 조회
- *     - Query Params: userId, symbol, orderId, startDate, endDate
- *     - TradeQueryService.getTrades() 호출 (TradeQueryService 생성 필요)
- *     - Pagination 지원
+ * - Query Params: userId, symbol, orderId, startDate, endDate
+ * - TradeQueryService.getTrades() 호출 (TradeQueryService 생성 필요)
+ * - Pagination 지원
  *
  * [ ] GET /api/trades/{tradeId} - 단일 체결 조회 (선택)
  *
@@ -40,8 +39,7 @@ public class TradeQueryController {
   @GetMapping
   public ResponseEntity<CommonResponse<Page<TradeResponse>>> getMyTrades(
       @RequestHeader("userId") Long userId,
-      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-  ) {
+      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     Page<TradeResponse> trades = tradeQueryService.getMyTrades(userId, pageable);
     return ResponseEntity.ok(CommonResponse.success(trades));
   }
@@ -49,8 +47,7 @@ public class TradeQueryController {
   @GetMapping("/order/{orderId}")
   public ResponseEntity<CommonResponse<List<TradeResponse>>> getTradesByOrder(
       @RequestHeader("userId") Long userId,
-      @PathVariable Long orderId
-  ) {
+      @PathVariable Long orderId) {
     List<TradeResponse> trades = tradeQueryService.getTradesByOrder(userId, orderId);
     return ResponseEntity.ok(CommonResponse.success(trades));
   }
