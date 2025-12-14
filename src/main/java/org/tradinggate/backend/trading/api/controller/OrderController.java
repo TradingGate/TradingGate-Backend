@@ -23,14 +23,14 @@ import org.tradinggate.backend.trading.service.OrderService;
  * - 유저 인증/권한 검증 후 Service로 위임
  * - HTTP 202 Accepted 응답 반환
  * TODO:
- * [✅️] POST /api/orders - 신규 주문 엔드포인트 구현
- *     - Request Body: OrderCreateRequest 받기
+ * [🔼] POST /api/orders - 신규 주문 엔드포인트 구현
+ *     - Request Body: OrderCreateRequest 받기✅
  *     - 인증 정보에서 userId 추출
- *     - OrderService.createOrder() 호출
+ *     - OrderService.createOrder() 호출 ✅
  *     - HTTP 202 + clientOrderId 반환
  * [✅️] POST /api/orders/cancel - 주문 취소 엔드포인트 구현
- *     - Request Body: OrderCancelRequest 받기
- *     - OrderService.cancelOrder() 호출
+ *     - Request Body: OrderCancelRequest 받기 ✅
+ *     - OrderService.cancelOrder() 호출 ✅
  *     - HTTP 202 응답
  * [ ] 예외 처리 추가
  *     - DuplicateOrderException -> 409 Conflict

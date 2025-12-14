@@ -1,8 +1,18 @@
 package org.tradinggate.backend.trading.api.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.tradinggate.backend.global.common.CommonResponse;
+import org.tradinggate.backend.trading.api.dto.response.TradeResponse;
+import org.tradinggate.backend.trading.service.TradeQueryService;
+
+import java.util.List;
 
 /**
  * [A-1] Trading API - 체결 조회 Controller
@@ -22,10 +32,26 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/trades")
-@Profile("api")
+@RequiredArgsConstructor
 public class TradeQueryController {
 
-  // TODO: TradeQueryService 주입 (생성 필요)
+  private final TradeQueryService tradeQueryService;
 
-  // TODO: getTrades() 구현
+  @GetMapping
+  public ResponseEntity<CommonResponse<Page<TradeResponse>>> getMyTrades(
+      @RequestHeader("userId") Long userId,
+      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+  ) {
+    Page<TradeResponse> trades = tradeQueryService.getMyTrades(userId, pageable);
+    return ResponseEntity.ok(CommonResponse.success(trades));
+  }
+
+  @GetMapping("/order/{orderId}")
+  public ResponseEntity<CommonResponse<List<TradeResponse>>> getTradesByOrder(
+      @RequestHeader("userId") Long userId,
+      @PathVariable Long orderId
+  ) {
+    List<TradeResponse> trades = tradeQueryService.getTradesByOrder(userId, orderId);
+    return ResponseEntity.ok(CommonResponse.success(trades));
+  }
 }

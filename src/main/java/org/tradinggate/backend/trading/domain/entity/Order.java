@@ -10,20 +10,14 @@ import java.time.LocalDateTime;
  * 역할:
  * - Trading DB trading_order 테이블 매핑
  * - Projection Consumer가 orders.updated 이벤트를 받아 저장
- * 참고: PDF 1 (trading_order 테이블 구조)
  */
 @Entity
-@Table(
-    name = "trading_order",
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "client_order_id"}),
-        @UniqueConstraint(columnNames = {"order_id"})
-    }
-)
-
+@Table(name = "trading_order", uniqueConstraints = {
+    @UniqueConstraint(columnNames = { "user_id", "client_order_id" }),
+    @UniqueConstraint(columnNames = { "order_id" })
+})
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 public class Order {
@@ -54,7 +48,7 @@ public class Order {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "time_in_force", nullable = false, length = 10)
-  private TimeInForce timeInForce;  // ✅ 추가
+  private TimeInForce timeInForce;
 
   @Column(precision = 18, scale = 8)
   private BigDecimal price;
@@ -62,10 +56,9 @@ public class Order {
   @Column(nullable = false, precision = 18, scale = 8)
   private BigDecimal quantity;
 
+  @Builder.Default
   @Column(name = "filled_quantity", precision = 18, scale = 8)
-  @Builder.Default  // ✅ @Column 아래로 이동
   private BigDecimal filledQuantity = BigDecimal.ZERO;
-
 
   @Column(name = "remaining_quantity", nullable = false, precision = 18, scale = 8)
   private BigDecimal remainingQuantity;
@@ -87,16 +80,16 @@ public class Order {
   private LocalDateTime updatedAt;
 
   @Column(name = "last_event_seq")
-  private Integer lastEventSeq;  // ✅ 추가
+  private Integer lastEventSeq;
 
   @Column(name = "last_event_time")
-  private LocalDateTime lastEventTime;  // ✅ 추가
+  private LocalDateTime lastEventTime;
 
   @PrePersist
   protected void onCreate() {
     this.createdAt = LocalDateTime.now();
     this.updatedAt = LocalDateTime.now();
-    if (this.filledQuantity == null) {  // ✅ 추가
+    if (this.filledQuantity == null) {
       this.filledQuantity = BigDecimal.ZERO;
     }
     if (this.remainingQuantity == null) {
@@ -107,5 +100,29 @@ public class Order {
   @PreUpdate
   protected void onUpdate() {
     this.updatedAt = LocalDateTime.now();
+  }
+
+  // ==========================
+  // Domain Business Methods
+  // ==========================
+
+  public void assignOrderId(Long orderId) {
+    this.orderId = orderId;
+  }
+
+  public void fill(BigDecimal filledQty, BigDecimal price, OrderStatus newStatus) {
+    this.filledQuantity = this.filledQuantity.add(filledQty);
+    this.remainingQuantity = this.remainingQuantity.subtract(filledQty);
+    // 평균 체결가 계산 로직 등 필요시 추가
+    this.status = newStatus;
+  }
+
+  public void cancel() {
+    this.status = OrderStatus.CANCELED;
+  }
+
+  public void reject(String reason) {
+    this.status = OrderStatus.REJECTED;
+    this.rejectReason = reason;
   }
 }

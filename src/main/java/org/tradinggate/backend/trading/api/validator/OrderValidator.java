@@ -1,39 +1,136 @@
 package org.tradinggate.backend.trading.api.validator;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
+import org.tradinggate.backend.global.exception.CustomException;
+import org.tradinggate.backend.global.exception.DomainErrorCode;
+import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
+import org.tradinggate.backend.trading.domain.entity.OrderType;
 
-/**
- * [A-1] Trading API - 주문 검증
- *
- * 역할:
- * - 심볼별 틱/스텝 규칙 검증
- * - 주문 타입별 필수 필드 검증
- *
- * TODO:
- * [ ] validate(OrderCreateRequest) 메서드 구현:
- *     1. Symbol 존재 여부 확인
- *        - SymbolRepository.findBySymbol() 또는 Redis 캐시 조회
- *        - 없으면 SymbolNotFoundException
- *     2. 가격이 priceTick 배수인지 확인
- *        - price % priceTick == 0
- *        - 아니면 InvalidOrderException("Price must be multiple of tick")
- *     3. 수량이 qtyStep 배수인지 확인
- *        - quantity % qtyStep == 0
- *     4. 주문 타입별 검증:
- *        - LIMIT: price 필수
- *        - MARKET: price 무시
- *     5. 수량/가격 범위 검증 (최소/최대)
- *
- * [ ] SymbolRepository 또는 Redis 캐시 조회
- *
- * [ ] 예외: InvalidOrderException, SymbolNotFoundException
- *
- * 참고: PDF 2-2 (기본 검증), 6 (trading_symbol_ref)
- */
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+
 @Component
+@RequiredArgsConstructor
+@Log4j2
 public class OrderValidator {
 
-  // TODO: SymbolRepository 주입 (또는 캐시)
+  private static final Map<String, TradingConstraints> SYMBOL_CONSTRAINTS = new HashMap<>();
 
-  // TODO: validate() 구현
+  static {
+    SYMBOL_CONSTRAINTS.put("BTCUSDT", TradingConstraints.builder()
+        .tickSize(new BigDecimal("0.01"))
+        .stepSize(new BigDecimal("0.00001"))
+        .minQuantity(new BigDecimal("0.001"))
+        .maxQuantity(new BigDecimal("1000"))
+        .minNotional(new BigDecimal("10"))
+        .build());
+
+    SYMBOL_CONSTRAINTS.put("ETHUSDT", TradingConstraints.builder()
+        .tickSize(new BigDecimal("0.01"))
+        .stepSize(new BigDecimal("0.0001"))
+        .minQuantity(new BigDecimal("0.01"))
+        .maxQuantity(new BigDecimal("10000"))
+        .minNotional(new BigDecimal("10"))
+        .build());
+  }
+
+  /**
+   * 주문 생성 검증
+   */
+  public void validate(OrderCreateRequest request) {
+    validateBasicFields(request);
+    validatePriceAndQuantity(request);
+    validateTradingConstraints(request);
+  }
+
+  private void validateBasicFields(OrderCreateRequest request) {
+    if (request.getSymbol() == null || request.getSymbol().isBlank()) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+    if (request.getType() == null) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+    if (request.getSide() == null) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+  }
+
+  private void validatePriceAndQuantity(OrderCreateRequest request) {
+    if (request.getType() == OrderType.LIMIT) {
+      if (request.getPrice() == null || request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+        throw new CustomException(DomainErrorCode.INVALID_PARAM);
+      }
+    }
+
+    if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+  }
+
+  private void validateTradingConstraints(OrderCreateRequest request) {
+    TradingConstraints constraints = SYMBOL_CONSTRAINTS.get(request.getSymbol());
+
+    if (constraints == null) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+
+    if (request.getPrice() != null) {
+      validateTickSize(request.getPrice(), constraints.getTickSize());
+    }
+
+    validateStepSize(request.getQuantity(), constraints.getStepSize());
+    validateQuantityRange(request.getQuantity(), constraints);
+    validateMinNotional(request, constraints);
+  }
+
+  private void validateTickSize(BigDecimal price, BigDecimal tickSize) {
+    BigDecimal remainder = price.remainder(tickSize);
+
+    if (remainder.compareTo(BigDecimal.ZERO) != 0) {
+      log.warn("틱 사이즈 위반: price={}, tickSize={}", price, tickSize);
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+  }
+
+  private void validateStepSize(BigDecimal quantity, BigDecimal stepSize) {
+    BigDecimal remainder = quantity.remainder(stepSize);
+
+    if (remainder.compareTo(BigDecimal.ZERO) != 0) {
+      log.warn("스텝 사이즈 위반: quantity={}, stepSize={}", quantity, stepSize);
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+  }
+
+  private void validateQuantityRange(BigDecimal quantity, TradingConstraints constraints) {
+    if (quantity.compareTo(constraints.getMinQuantity()) < 0) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+
+    if (quantity.compareTo(constraints.getMaxQuantity()) > 0) {
+      throw new CustomException(DomainErrorCode.INVALID_PARAM);
+    }
+  }
+
+  private void validateMinNotional(OrderCreateRequest request, TradingConstraints constraints) {
+    if (request.getPrice() != null) {
+      BigDecimal notional = request.getPrice().multiply(request.getQuantity());
+
+      if (notional.compareTo(constraints.getMinNotional()) < 0) {
+        throw new CustomException(DomainErrorCode.INVALID_PARAM);
+      }
+    }
+  }
+
+  @lombok.Builder
+  @lombok.Getter
+  private static class TradingConstraints {
+    private BigDecimal tickSize;
+    private BigDecimal stepSize;
+    private BigDecimal minQuantity;
+    private BigDecimal maxQuantity;
+    private BigDecimal minNotional;
+  }
 }

@@ -1,29 +1,39 @@
 package org.tradinggate.backend.trading.domain.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.tradinggate.backend.trading.domain.entity.Order;
+import org.tradinggate.backend.trading.domain.entity.OrderStatus;
 
-/**
- * [A-1] Trading API - 주문 Repository
- *
- * 역할:
- * - Trading DB 조회
- * - Read-Only (API Layer는 쓰기 안 함)
- *
- * TODO:
- * [ ] 메서드 추가:
- *     - Optional<Order> findByUserIdAndClientOrderId(Long userId, String clientOrderId)
- *     - Optional<Order> findByOrderId(Long orderId)
- *     - Page<Order> findByUserId(Long userId, Pageable pageable)
- *     - Page<Order> findByUserIdAndSymbol(Long userId, String symbol, Pageable pageable)
- *     - Page<Order> findByUserIdAndStatus(Long userId, OrderStatus status, Pageable pageable)
- *     - Page<Order> findByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end, Pageable pageable)
- *
- * [ ] Query Method 또는 @Query 사용
- *
- * 참고: PDF 2-4 (Trading DB 조회)
- */
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-  // TODO: 조회 메서드 정의
+  Optional<Order> findByIdempotencyKey(String idempotencyKey);
+
+  Slice<Order> findByUserId(Long userId, Pageable pageable);
+
+  Page<Order> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+
+  List<Order> findByUserIdAndStatus(Long userId, OrderStatus status);
+
+  List<Order> findByUserIdAndSymbol(Long userId, String symbol);
+
+  List<Order> findByUserIdAndCreatedAtBetween(
+      Long userId,
+      LocalDateTime startDate,
+      LocalDateTime endDate
+  );
+
+  @Query("SELECT o FROM Order o WHERE o.userId = :userId AND o.status = 'PENDING' ORDER BY o.createdAt DESC")
+  List<Order> findPendingOrders(@Param("userId") Long userId);
+
+  @Query("SELECT COUNT(o) FROM Order o WHERE o.userId = :userId AND o.symbol = :symbol AND o.status = 'PENDING'")
+  long countPendingOrdersBySymbol(@Param("userId") Long userId, @Param("symbol") String symbol);
 }

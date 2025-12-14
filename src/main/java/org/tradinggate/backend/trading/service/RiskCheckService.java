@@ -1,40 +1,139 @@
 package org.tradinggate.backend.trading.service;
 
-import org.springframework.context.annotation.Profile;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.tradinggate.backend.trading.exception.RiskBlockedException;
 
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 /**
- * [A-1] Trading API - 리스크 상태 체크 서비스
- *
- * 역할:
- * - Redis에서 리스크 차단 상태 확인
- * - Risk Management Layer(B-2)에서 발행한 risk.commands를
- *   Worker 프로필이 Redis에 저장 → API는 읽기만
- *
- * TODO:
- * [ ] isBlocked(Long userId, String symbol) 구현:
- *     1. Redis key 조회:
- *        - "risk:block:{userId}" (계정 전체 차단)
- *        - "risk:block:{userId}:{symbol}" (심볼별 차단)
- *     2. 값이 존재하면:
- *        → RiskBlockedException 발생
- *     3. 없으면 정상 진행
- *
- * [ ] Redis 읽기만 수행 (API Layer는 Consumer 없음)
- *
- * [ ] 예외: RiskBlockedException
- *     - errorCode: "RISK_BLOCKED"
- *     - message: "User is blocked due to risk limit"
- *
- * 참고: PDF 2-2, B-3 (리스크 제어 이벤트 발행)
+ * 리스크 차단 체크 서비스
+ * - Redis 기반 실시간 리스크 모니터링
+ * - 일일 거래 한도, 거래 빈도 제한
  */
 @Service
-@Profile("api")
+@RequiredArgsConstructor
+@Log4j2
 public class RiskCheckService {
 
-  // TODO: RedisTemplate 주입
+  private final StringRedisTemplate redisTemplate;
 
-  // TODO: isBlocked(userId, symbol) 구현
+  private static final String RISK_BLOCK_KEY_PREFIX = "risk:block:user:";
+  private static final String DAILY_VOLUME_KEY_PREFIX = "risk:volume:user:";
+  private static final String ORDER_COUNT_KEY_PREFIX = "risk:count:user:";
 
-  // TODO: RiskBlockedException 정의
+  private static final BigDecimal DAILY_VOLUME_LIMIT = new BigDecimal("100000000");
+  private static final int DAILY_ORDER_COUNT_LIMIT = 1000;
+  private static final int ORDER_RATE_LIMIT_PER_MINUTE = 10;
+
+  /**
+   * 사용자가 리스크 차단되었는지 확인
+   */
+  public boolean isBlocked(Long userId) {
+    String key = RISK_BLOCK_KEY_PREFIX + userId;
+    Boolean blocked = redisTemplate.hasKey(key);
+
+    if (Boolean.TRUE.equals(blocked)) {
+      log.warn("리스크 차단된 사용자: userId={}", userId);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 사용자 리스크 차단
+   */
+  public void blockUser(Long userId, Duration duration) {
+    String key = RISK_BLOCK_KEY_PREFIX + userId;
+    redisTemplate.opsForValue().set(key, "BLOCKED", duration);
+    log.warn("사용자 리스크 차단: userId={}, duration={}", userId, duration);
+  }
+
+  /**
+   * 일일 거래량 체크
+   */
+  public boolean checkDailyVolume(Long userId, BigDecimal orderAmount) {
+    String key = DAILY_VOLUME_KEY_PREFIX + userId;
+    String currentVolumeStr = redisTemplate.opsForValue().get(key);
+
+    BigDecimal currentVolume = currentVolumeStr != null
+        ? new BigDecimal(currentVolumeStr)
+        : BigDecimal.ZERO;
+
+    BigDecimal newVolume = currentVolume.add(orderAmount);
+
+    if (newVolume.compareTo(DAILY_VOLUME_LIMIT) > 0) {
+      log.warn("일일 거래량 한도 초과: userId={}, current={}, limit={}",
+          userId, newVolume, DAILY_VOLUME_LIMIT);
+      blockUser(userId, Duration.ofHours(24));
+      return false;
+    }
+
+    redisTemplate.opsForValue().set(key, newVolume.toString(), Duration.ofDays(1));
+    return true;
+  }
+
+  /**
+   * 일일 주문 횟수 체크
+   */
+  public boolean checkDailyOrderCount(Long userId) {
+    String key = ORDER_COUNT_KEY_PREFIX + userId + ":daily";
+    Long count = redisTemplate.opsForValue().increment(key);
+
+    if (count == 1) {
+      redisTemplate.expire(key, Duration.ofDays(1));
+    }
+
+    if (count > DAILY_ORDER_COUNT_LIMIT) {
+      log.warn("일일 주문 횟수 한도 초과: userId={}, count={}", userId, count);
+      blockUser(userId, Duration.ofHours(24));
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 분당 주문 빈도 체크
+   */
+  public boolean checkOrderRateLimit(Long userId) {
+    String key = ORDER_COUNT_KEY_PREFIX + userId + ":minute";
+    Long count = redisTemplate.opsForValue().increment(key);
+
+    if (count == 1) {
+      redisTemplate.expire(key, 1, TimeUnit.MINUTES);
+    }
+
+    if (count > ORDER_RATE_LIMIT_PER_MINUTE) {
+      log.warn("분당 주문 빈도 제한 초과: userId={}, count={}", userId, count);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 종합 리스크 체크
+   */
+  public void validateRisk(Long userId, BigDecimal orderAmount) {
+    if (isBlocked(userId)) {
+      throw new RiskBlockedException("리스크 차단된 사용자입니다");
+    }
+
+    if (!checkDailyVolume(userId, orderAmount)) {
+      throw new RiskBlockedException("일일 거래량 한도를 초과했습니다");
+    }
+
+    if (!checkDailyOrderCount(userId)) {
+      throw new RiskBlockedException("일일 주문 횟수 한도를 초과했습니다");
+    }
+
+    if (!checkOrderRateLimit(userId)) {
+      throw new RiskBlockedException("주문 빈도가 너무 높습니다");
+    }
+  }
 }

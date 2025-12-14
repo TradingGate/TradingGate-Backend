@@ -7,49 +7,13 @@ import org.springframework.stereotype.Service;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.api.validator.OrderValidator;
+import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.OrderStatus;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
+import org.tradinggate.backend.trading.exception.InvalidOrderException;
 import org.tradinggate.backend.trading.exception.OrderNotFoundException;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 
-/**
- * [A-1] Trading API - 주문 비즈니스 로직
- *
- * 역할:
- * - 주문 생성/취소의 핵심 비즈니스 로직
- * - 검증 → 멱등성 체크 → Kafka 발행
- * - ⚠️ DB에는 쓰지 않음 (Kafka만 발행) ⚠️
- *
- * TODO:
- * [🔼] createOrder(OrderCreateRequest, Long userId) 구현:
- *     1. 유저 권한 검증 (해당 심볼 거래 가능한지)✅️
- *     2. OrderValidator.validate() 호출 (틱/스텝 검증)
- *     3. RiskCheckService.isBlocked(userId, symbol) 호출
- *        → 차단 상태면 RiskBlockedException 발생
- *     4. IdempotencyService.checkAndLock(userId, clientOrderId)✅️
- *        → 중복이면 DuplicateOrderException 발생
- *     5. OrderEventProducer.publishNewOrder() - Kafka 발행✅️
- *     6. 임시 응답 반환 (clientOrderId, received=true)✅️
- *
- * [🔼] cancelOrder(OrderCancelRequest, Long userId) 구현:
- *     1. 주문 소유권 검증 (DB 조회 or 토큰)
- *        → OrderRepository.findByUserIdAndClientOrderId()
- *        → 소유자 불일치 시 예외
- *     2. 이미 체결/취소된 주문인지 확인
- *        → status가 FILLED/CANCELED면 에러 응답
- *     3. OrderEventProducer.publishCancelOrder() - Kafka 발행✅️
- *     4. 응답 반환✅️
- *
- * [ ] 트랜잭션 처리 없음 (DB 쓰기 X, Kafka만 발행)
- *
- * [ ] 예외 처리:
- *     - DuplicateOrderException
- *     - RiskBlockedException
- *     - InvalidOrderException
- *     - OrderNotFoundException
- *
- * 참고: PDF 2-2 (A-1 Trading API 내부 처리)
- */
 @Slf4j
 @Service
 @Profile("api")
@@ -58,19 +22,28 @@ public class OrderService {
 
   private final IdempotencyService idempotencyService;
   private final OrderEventProducer orderEventProducer;
+  private final OrderValidator orderValidator;
+  private final RiskCheckService riskCheckService;
+  private final OrderRepository orderRepository;
 
-  /**신규 주문 생성*/
+  /** 신규 주문 생성 */
   public OrderCreateResponse createOrder(OrderCreateRequest request, Long userId) {
     log.info("Creating order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
 
-    // 1. 멱등성 체크
+    // 1. 유저 권한 및 리스크 상태 검증
+    riskCheckService.isBlocked(userId, request.getSymbol());
+
+    // 2. 주문 유효성 검증 (틱/스텝, 필수값)
+    orderValidator.validate(request);
+
+    // 3. 멱등성 체크
     idempotencyService.checkAndLock(userId, request.getClientOrderId());
 
     try {
-      // 2. Kafka orders.in 발행
+      // 4. Kafka orders.in 발행
       orderEventProducer.publishNewOrder(request, userId);
 
-      // 3. 응답 반환
+      // 5. 응답 반환
       return OrderCreateResponse.builder()
           .clientOrderId(request.getClientOrderId())
           .received(true)
@@ -78,16 +51,31 @@ public class OrderService {
           .build();
 
     } catch (Exception e) {
+      log.error("Failed to process create order", e);
       idempotencyService.markFailed(userId, request.getClientOrderId());
       throw e;
     }
   }
 
-  /**주문 취소*/
+  /** 주문 취소 */
   public OrderCancelResponse cancelOrder(OrderCancelRequest request, Long userId) {
     log.info("Cancelling order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
 
-    // Kafka orders.in 취소 이벤트 발행
+    // 1. 주문 소유권 검증 (DB 조회)
+    // clientOrderId 또는 orderId로 조회가 필요하나, request에는 clientOrderId가 필수
+    Order order = orderRepository.findByUserIdAndClientOrderId(userId, request.getClientOrderId())
+        .orElseThrow(
+            () -> new OrderNotFoundException("Order not found or invalid ownership: " + request.getClientOrderId()));
+
+    // 2. 이미 종료된 주문인지 확인
+    if (order.getStatus() == OrderStatus.FILLED ||
+        order.getStatus() == OrderStatus.CANCELED ||
+        order.getStatus() == OrderStatus.REJECTED ||
+        order.getStatus() == OrderStatus.EXPIRED) {
+      throw new InvalidOrderException("Order cannot be canceled in state: " + order.getStatus());
+    }
+
+    // 3. Kafka orders.in 취소 이벤트 발행
     orderEventProducer.publishCancelOrder(request, userId);
 
     return OrderCancelResponse.builder()
