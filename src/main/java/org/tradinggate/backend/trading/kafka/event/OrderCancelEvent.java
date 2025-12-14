@@ -31,7 +31,7 @@ import java.time.LocalDateTime;
 public class OrderCancelEvent {
 
   @JsonProperty("commandType")
-  private String commandType;  // "CANCEL"
+  private String commandType; // "CANCEL"
 
   @JsonProperty("userId")
   private Long userId;
@@ -46,28 +46,25 @@ public class OrderCancelEvent {
   private CancelTarget cancelTarget;
 
   @JsonProperty("source")
-  private String source;  // "API"
+  private String source; // "API"
 
   @JsonProperty("receivedAt")
   private LocalDateTime receivedAt;
 
-  /**
-   * 취소 대상 지정 (PDF 스키마)
-   */
   @Getter
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
   public static class CancelTarget {
     @JsonProperty("by")
-    private String by;  // "CLIENT_ORDER_ID" or "ORDER_ID"
+    private String by; // "CLIENT_ORDER_ID" or "ORDER_ID"
 
     @JsonProperty("value")
-    private String value;  // clientOrderId 또는 orderId 값
+    private String value; // clientOrderId 또는 orderId 값
   }
 
   /**
-   * Order Entity -> OrderCancelEvent 변환 (PDF 스키마)
+   * Order Entity -> OrderCancelEvent 변환
    * - clientOrderId 기준으로 취소
    */
   public static OrderCancelEvent from(Order order) {
@@ -77,7 +74,7 @@ public class OrderCancelEvent {
         .clientOrderId(order.getClientOrderId())
         .symbol(order.getSymbol())
         .cancelTarget(CancelTarget.builder()
-            .by("CLIENT_ORDER_ID")                    // ✅ clientOrderId로 취소
+            .by("CLIENT_ORDER_ID")
             .value(order.getClientOrderId())
             .build())
         .source("API")
@@ -95,7 +92,7 @@ public class OrderCancelEvent {
         .clientOrderId(order.getClientOrderId())
         .symbol(order.getSymbol())
         .cancelTarget(CancelTarget.builder()
-            .by("ORDER_ID")                           // ✅ orderId로 취소
+            .by("ORDER_ID") // ✅ orderId로 취소
             .value(order.getOrderId() != null ? order.getOrderId().toString() : null)
             .build())
         .source("API")

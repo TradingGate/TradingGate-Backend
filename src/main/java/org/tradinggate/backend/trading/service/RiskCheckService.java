@@ -8,6 +8,7 @@ import org.tradinggate.backend.trading.exception.RiskBlockedException;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -58,7 +59,7 @@ public class RiskCheckService {
    */
   public void blockUser(Long userId, Duration duration) {
     String key = RISK_BLOCK_KEY_PREFIX + userId;
-    redisTemplate.opsForValue().set(key, "BLOCKED", duration);
+    redisTemplate.opsForValue().set(key, "BLOCKED", Objects.requireNonNull(duration));
     log.warn("사용자 리스크 차단: userId={}, duration={}", userId, duration);
   }
 
@@ -78,11 +79,12 @@ public class RiskCheckService {
     if (newVolume.compareTo(DAILY_VOLUME_LIMIT) > 0) {
       log.warn("일일 거래량 한도 초과: userId={}, current={}, limit={}",
           userId, newVolume, DAILY_VOLUME_LIMIT);
-      blockUser(userId, Duration.ofHours(24));
+      blockUser(userId, Objects.requireNonNull(Duration.ofHours(24)));
       return false;
     }
 
-    redisTemplate.opsForValue().set(key, newVolume.toString(), Duration.ofDays(1));
+    redisTemplate.opsForValue().set(key, Objects.requireNonNull(newVolume.toString()),
+        Objects.requireNonNull(Duration.ofDays(1)));
     return true;
   }
 
@@ -93,13 +95,13 @@ public class RiskCheckService {
     String key = ORDER_COUNT_KEY_PREFIX + userId + ":daily";
     Long count = redisTemplate.opsForValue().increment(key);
 
-    if (count == 1) {
-      redisTemplate.expire(key, Duration.ofDays(1));
+    if (count != null && count == 1) {
+      redisTemplate.expire(key, Objects.requireNonNull(Duration.ofDays(1)));
     }
 
-    if (count > DAILY_ORDER_COUNT_LIMIT) {
+    if (count != null && count > DAILY_ORDER_COUNT_LIMIT) {
       log.warn("일일 주문 횟수 한도 초과: userId={}, count={}", userId, count);
-      blockUser(userId, Duration.ofHours(24));
+      blockUser(userId, Objects.requireNonNull(Duration.ofHours(24)));
       return false;
     }
 
@@ -113,11 +115,11 @@ public class RiskCheckService {
     String key = ORDER_COUNT_KEY_PREFIX + userId + ":minute";
     Long count = redisTemplate.opsForValue().increment(key);
 
-    if (count == 1) {
+    if (count != null && count == 1) {
       redisTemplate.expire(key, 1, TimeUnit.MINUTES);
     }
 
-    if (count > ORDER_RATE_LIMIT_PER_MINUTE) {
+    if (count != null && count > ORDER_RATE_LIMIT_PER_MINUTE) {
       log.warn("분당 주문 빈도 제한 초과: userId={}, count={}", userId, count);
       return false;
     }

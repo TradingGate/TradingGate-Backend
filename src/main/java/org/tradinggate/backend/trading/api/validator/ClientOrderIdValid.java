@@ -1,11 +1,11 @@
 package org.tradinggate.backend.trading.api.validator;
 
-import jakarta.validation.Constraint;
+// import jakarta.validation.Constraint;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+// import java.lang.annotation.ElementType;
+// import java.lang.annotation.Retention;
+// import java.lang.annotation.RetentionPolicy;
+// import java.lang.annotation.Target;
 /**
  * [A-1] Trading API - clientOrderId 검증
  *

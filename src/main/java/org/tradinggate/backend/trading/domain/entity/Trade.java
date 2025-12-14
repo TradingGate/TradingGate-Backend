@@ -17,14 +17,11 @@ import java.time.LocalDateTime;
  * - Projection Consumer가 trades.executed 이벤트를 받아 저장
  */
 @Entity
-@Table(
-    name = "trading_trade",
-    indexes = {
-        @Index(name = "idx_trade_id", columnList = "trade_id", unique = true),
-        @Index(name = "idx_order_id", columnList = "order_id"),
-        @Index(name = "idx_user_exec_time", columnList = "user_id, exec_time DESC")
-    }
-)
+@Table(name = "trading_trade", indexes = {
+    @Index(name = "idx_trade_id", columnList = "trade_id", unique = true),
+    @Index(name = "idx_order_id", columnList = "order_id"),
+    @Index(name = "idx_user_exec_time", columnList = "user_id, exec_time DESC")
+})
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -83,18 +80,18 @@ public class Trade extends Timestamped {
    * 체결 생성
    * - Kafka 이벤트(trades.executed)에서 받은 데이터로 생성
    *
-   * @param tradeId 매칭 엔진 체결 ID
-   * @param matchId 매칭 단위 ID
-   * @param orderId 주문 ID
-   * @param userId 사용자 ID
-   * @param symbol 거래 심볼
-   * @param side 주문 방향
-   * @param execQuantity 체결 수량
-   * @param execPrice 체결 가격
-   * @param feeAmount 수수료
-   * @param feeCurrency 수수료 통화
+   * @param tradeId       매칭 엔진 체결 ID
+   * @param matchId       매칭 단위 ID
+   * @param orderId       주문 ID
+   * @param userId        사용자 ID
+   * @param symbol        거래 심볼
+   * @param side          주문 방향
+   * @param execQuantity  체결 수량
+   * @param execPrice     체결 가격
+   * @param feeAmount     수수료
+   * @param feeCurrency   수수료 통화
    * @param liquidityFlag MAKER/TAKER
-   * @param execTime 체결 시각
+   * @param execTime      체결 시각
    * @return Trade 인스턴스
    */
   public static Trade create(
@@ -109,13 +106,12 @@ public class Trade extends Timestamped {
       BigDecimal feeAmount,
       String feeCurrency,
       String liquidityFlag,
-      LocalDateTime execTime
-  ) {
+      LocalDateTime execTime) {
     // 체결 금액 계산 (quantity * price)
     BigDecimal execValue = execQuantity.multiply(execPrice);
 
     return new Trade(
-        null,  // id는 DB에서 자동 생성
+        null, // id는 DB에서 자동 생성
         tradeId,
         matchId,
         orderId,
@@ -128,8 +124,7 @@ public class Trade extends Timestamped {
         feeAmount,
         feeCurrency,
         liquidityFlag,
-        execTime
-    );
+        execTime);
   }
 
   // =====================================
@@ -156,7 +151,6 @@ public class Trade extends Timestamped {
   public String toString() {
     return String.format(
         "Trade[tradeId=%d, orderId=%d, symbol=%s, side=%s, qty=%s, price=%s, flag=%s]",
-        tradeId, orderId, symbol, side, execQuantity, execPrice, liquidityFlag
-    );
+        tradeId, orderId, symbol, side, execQuantity, execPrice, liquidityFlag);
   }
 }

@@ -10,23 +10,8 @@ import java.time.LocalDateTime;
 
 /**
  * [A-1] Trading API - 체결 응답 DTO
- *
  * 역할:
  * - API → 클라이언트 체결 정보 응답
- *
- * TODO:
- * [ ] Trade Entity → TradeResponse 변환 메서드 추가
- *     - static TradeResponse from(Trade trade)
- *
- * [ ] 필드 정의:
- *     - tradeId, matchId, orderId, userId
- *     - symbol, side
- *     - execQuantity, execPrice, execValue
- *     - feeAmount, feeCurrency
- *     - liquidityFlag (MAKER/TAKER)
- *     - execTime
- *
- * 참고: PDF 3 (trading_trade 테이블 구조)
  */
 @Getter
 @Builder
@@ -46,7 +31,6 @@ public class TradeResponse {
   private String feeCurrency;
   private String liquidityFlag;
   private LocalDateTime execTime;
-  private LocalDateTime createdAt;
 
   /**
    * Entity -> DTO 변환
@@ -67,7 +51,6 @@ public class TradeResponse {
         .feeCurrency(trade.getFeeCurrency())
         .liquidityFlag(trade.getLiquidityFlag())
         .execTime(trade.getExecTime())
-        .createdAt(trade.getCreatedAt())
         .build();
   }
 }

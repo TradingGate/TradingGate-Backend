@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Profile;
  *
  * TODO:
  * [ ] Kafka Consumer 비활성화 확인:
- *     - @KafkaListener는 worker 프로필에서만 활성화
- *     - API Layer는 Producer만 사용
+ * - @KafkaListener는 worker 프로필에서만 활성화
+ * - API Layer는 Producer만 사용
  *
  * [ ] 프로필별 Bean 조건부 로딩
  *
@@ -22,6 +22,6 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 @Profile("api")
 public class ApiProfileConfig {
-  //check
+  // check
   // TODO: API 전용 설정
 }

@@ -17,15 +17,11 @@ import java.time.LocalDateTime;
 
 /**
  * [A-1] Trading API - 주문 응답 DTO
- *
  * 역할:
  * - API → 클라이언트 주문 정보 응답
  * - Entity의 필요한 필드만 노출 (민감 정보 제외)
- *
  * 변환:
  * - Entity → DTO: static from(Order order)
- *
- * 참고: PDF 1 (trading_order 테이블 구조)
  */
 @Getter
 @Builder

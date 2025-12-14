@@ -45,7 +45,7 @@ public class OrderService {
           userId,
           request.getClientOrderId(),
           request.getSymbol(),
-          request.getSide(),
+          request.getOrderSide(),
           request.getOrderType(),
           request.getTimeInForce(),
           request.getPrice(),

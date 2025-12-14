@@ -21,6 +21,7 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("멱등성 서비스 테스트")
+@SuppressWarnings("null")
 class IdempotencyServiceTest {
 
   @Mock
@@ -80,13 +81,11 @@ class IdempotencyServiceTest {
     String clientOrderId = "cli-20241204-0001";
     String expectedKey = "order:idempotency:1:cli-20241204-0001";
 
-    // ✅ when() 제거 - delete는 Boolean 반환하므로 stub 불필요
-
     // when
     idempotencyService.markFailed(userId, clientOrderId);
 
     // then
     verify(redisTemplate, times(1)).delete(expectedKey);
-    verifyNoMoreInteractions(redisTemplate); // ✅ 추가 - 다른 호출 없음 확인
+    verifyNoMoreInteractions(redisTemplate);
   }
 }

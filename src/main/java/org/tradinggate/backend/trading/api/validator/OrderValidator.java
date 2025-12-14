@@ -53,7 +53,7 @@ public class OrderValidator {
     if (request.getOrderType() == null) {
       throw new CustomException(DomainErrorCode.INVALID_PARAM);
     }
-    if (request.getSide() == null) {
+    if (request.getOrderSide() == null) {
       throw new CustomException(DomainErrorCode.INVALID_PARAM);
     }
   }

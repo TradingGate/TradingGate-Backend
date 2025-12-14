@@ -2,7 +2,6 @@ package org.tradinggate.backend.trading.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.tradinggate.backend.global.base.Timestamped;
 import org.tradinggate.backend.global.exception.CustomException;
 import org.tradinggate.backend.global.exception.DomainErrorCode;
 

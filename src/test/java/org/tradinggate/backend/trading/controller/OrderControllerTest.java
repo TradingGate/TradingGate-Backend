@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;  // ✅ 추가
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.tradinggate.backend.trading.api.controller.OrderController;
@@ -30,116 +30,113 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 /**
  * OrderController 테스트
  */
-@WebMvcTest(
-    controllers = OrderController.class,
-    excludeAutoConfiguration = {
-        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
-        org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class
-    }
-)
-@ActiveProfiles("api")  // ✅ 추가
+@WebMvcTest(controllers = OrderController.class, excludeAutoConfiguration = {
+                org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+                org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class
+})
+@ActiveProfiles("api")
 @DisplayName("주문 Controller 테스트")
-@SuppressWarnings("removal")
+@SuppressWarnings({ "removal", "null" })
 class OrderControllerTest {
 
-  @Autowired
-  private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-  @Autowired
-  private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-  @MockBean
-  private OrderService orderService;
+        @MockBean
+        private OrderService orderService;
 
-  @Test
-  @DisplayName("POST /api/orders - 신규 주문 성공")
-  void createOrder_Success() throws Exception {
-    // given
-    OrderCreateRequest request = OrderCreateRequest.builder()
-        .clientOrderId("cli-20241204-0001")
-        .symbol("BTCUSDT")
-        .side(OrderSide.BUY)
-        .orderType(OrderType.LIMIT)
-        .timeInForce(TimeInForce.GTC)
-        .price(new BigDecimal("50000.00"))
-        .quantity(new BigDecimal("0.1"))
-        .build();
+        @Test
+        @DisplayName("POST /api/orders - 신규 주문 성공")
+        void createOrder_Success() throws Exception {
+                // given
+                OrderCreateRequest request = OrderCreateRequest.builder()
+                                .clientOrderId("cli-20241204-0001")
+                                .symbol("BTCUSDT")
+                                .orderSide(OrderSide.BUY)
+                                .orderType(OrderType.LIMIT)
+                                .timeInForce(TimeInForce.GTC)
+                                .price(new BigDecimal("50000.00"))
+                                .quantity(new BigDecimal("0.1"))
+                                .build();
 
-    OrderService.OrderCreateResponse response = OrderService.OrderCreateResponse.builder()
-        .clientOrderId("cli-20241204-0001")
-        .received(true)
-        .message("Order received")
-        .build();
+                OrderService.OrderCreateResponse response = OrderService.OrderCreateResponse.builder()
+                                .clientOrderId("cli-20241204-0001")
+                                .received(true)
+                                .message("Order received")
+                                .build();
 
-    when(orderService.createOrder(any(OrderCreateRequest.class), anyLong()))
-        .thenReturn(response);
+                when(orderService.createOrder(any(OrderCreateRequest.class), anyLong()))
+                                .thenReturn(response);
 
-    // when
-    MvcResult result = mockMvc.perform(post("/api/orders")
-            .header("X-User-Id", "1")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(request)))
-        .andDo(print())
-        .andReturn();
+                // when
+                MvcResult result = mockMvc.perform(post("/api/orders")
+                                .header("X-User-Id", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andReturn();
 
-    // then
-    assertEquals(202, result.getResponse().getStatus());
-  }
+                // then
+                assertEquals(202, result.getResponse().getStatus());
+        }
 
-  @Test
-  @DisplayName("POST /api/orders - Validation 실패")
-  void createOrder_ValidationFail() throws Exception {
-    // given
-    String invalidJson = """
-                {
-                    "symbol": "BTCUSDT",
-                    "side": "BUY",
-                    "orderType": "LIMIT",
-                    "timeInForce": "GTC",
-                    "price": 50000.00,
-                    "quantity": 0.1
-                }
-                """;
+        @Test
+        @DisplayName("POST /api/orders - Validation 실패")
+        void createOrder_ValidationFail() throws Exception {
+                // given
+                String invalidJson = """
+                                {
+                                    "symbol": "BTCUSDT",
+                                    "side": "BUY",
+                                    "orderType": "LIMIT",
+                                    "timeInForce": "GTC",
+                                    "price": 50000.00,
+                                    "quantity": 0.1
+                                }
+                                """;
 
-    // when
-    MvcResult result = mockMvc.perform(post("/api/orders")
-            .header("X-User-Id", "1")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(invalidJson))
-        .andDo(print())
-        .andReturn();
+                // when
+                MvcResult result = mockMvc.perform(post("/api/orders")
+                                .header("X-User-Id", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(invalidJson))
+                                .andDo(print())
+                                .andReturn();
 
-    // then
-    assertEquals(400, result.getResponse().getStatus());
-  }
+                // then
+                assertEquals(400, result.getResponse().getStatus());
+        }
 
-  @Test
-  @DisplayName("POST /api/orders/cancel - 주문 취소 성공")
-  void cancelOrder_Success() throws Exception {
-    // given
-    OrderCancelRequest request = OrderCancelRequest.builder()
-        .clientOrderId("cli-20241204-0001")
-        .symbol("BTCUSDT")
-        .build();
+        @Test
+        @DisplayName("POST /api/orders/cancel - 주문 취소 성공")
+        void cancelOrder_Success() throws Exception {
+                // given
+                OrderCancelRequest request = OrderCancelRequest.builder()
+                                .clientOrderId("cli-20241204-0001")
+                                .symbol("BTCUSDT")
+                                .build();
 
-    OrderService.OrderCancelResponse response = OrderService.OrderCancelResponse.builder()
-        .clientOrderId("cli-20241204-0001")
-        .received(true)
-        .message("Cancel request received")
-        .build();
+                OrderService.OrderCancelResponse response = OrderService.OrderCancelResponse.builder()
+                                .clientOrderId("cli-20241204-0001")
+                                .received(true)
+                                .message("Cancel request received")
+                                .build();
 
-    when(orderService.cancelOrder(any(OrderCancelRequest.class), anyLong()))
-        .thenReturn(response);
+                when(orderService.cancelOrder(any(OrderCancelRequest.class), anyLong()))
+                                .thenReturn(response);
 
-    // when
-    MvcResult result = mockMvc.perform(post("/api/orders/cancel")
-            .header("X-User-Id", "1")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(request)))
-        .andDo(print())
-        .andReturn();
+                // when
+                MvcResult result = mockMvc.perform(post("/api/orders/cancel")
+                                .header("X-User-Id", "1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andReturn();
 
-    // then
-    assertEquals(202, result.getResponse().getStatus());
-  }
+                // then
+                assertEquals(202, result.getResponse().getStatus());
+        }
 }
