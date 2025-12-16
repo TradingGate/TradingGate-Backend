@@ -13,22 +13,18 @@ import java.math.BigDecimal;
  * 역할:
  * - 클라이언트 → API 신규 주문 요청
  * - 필수 필드 검증
- *
- * TODO:
- * 
- * [ ] Custom Validator 연동:
- * - @ClientOrderIdValid (ClientOrderIdValidator)
- * - @OrderValid (OrderValidator)
  */
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@org.tradinggate.backend.trading.api.validator.OrderValid
 public class OrderCreateRequest {
 
   @NotBlank(message = "clientOrderId is required")
   @Size(min = 5, max = 64, message = "clientOrderId must be between 5 and 64 characters")
+  @org.tradinggate.backend.trading.api.validator.ClientOrderIdValid
   private String clientOrderId;
 
   @NotBlank(message = "symbol is required")

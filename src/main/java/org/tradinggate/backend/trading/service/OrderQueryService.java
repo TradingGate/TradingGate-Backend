@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.exception.CustomException;
 import org.tradinggate.backend.global.exception.UserErrorCode;
+import org.tradinggate.backend.trading.api.dto.request.OrderQueryRequest;
 import org.tradinggate.backend.trading.api.dto.response.OrderResponse;
 import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.OrderStatus;
@@ -24,24 +25,6 @@ import java.util.stream.Collectors;
  * 역할:
  * - Trading DB에서 주문 정보 읽기
  * - Read-Only 작업
- * TODO:
- * [ ] getOrders(OrderQueryRequest, Pageable) - 조건별 주문 목록 조회
- *     - OrderRepository.findByUserIdAndSymbol() 등 활용
- *     - Pagination 처리
- *     - OrderResponse 리스트 반환
- * [ ] getOrderById(Long orderId) - 단일 주문 조회
- *     - OrderRepository.findByOrderId()
- *     - 없으면 OrderNotFoundException
- * [ ] getOrderByClientOrderId(Long userId, String clientOrderId)
- *     - 멱등성 체크용 조회
- *     - OrderRepository.findByUserIdAndClientOrderId()
- * 참고: PDF 2-4 (Projection Consumer → Trading DB)
- **/
-
-/**
- * 주문 조회 전용 서비스 (CQRS Query)
- * - @Transactional(readOnly = true) 로 읽기 최적화
- * - 복잡한 조회 쿼리 처리
  */
 @Service
 @RequiredArgsConstructor
@@ -52,12 +35,38 @@ public class OrderQueryService {
   private final OrderRepository orderRepository;
 
   /**
+   * 조건별 주문 목록 조회
+   */
+  public Page<OrderResponse> getOrders(Long userId, OrderQueryRequest request, Pageable pageable) {
+    Page<Order> orders = orderRepository.findByConditions(
+        userId,
+        request.getSymbol(),
+        request.getStatus(),
+        request.getStartDate(),
+        request.getEndDate(),
+        pageable);
+    return orders.map(OrderResponse::from);
+  }
+
+  /**
    * 주문 ID로 단건 조회
    */
-  public OrderResponse getOrder(Long userId, Long orderId) {
+  public OrderResponse getOrderById(Long userId, Long orderId) {
     Order order = orderRepository.findById(orderId)
         .orElseThrow(() -> new OrderNotFoundException("주문을 찾을 수 없습니다: " + orderId));
 
+    validateUserAccess(order, userId);
+    return OrderResponse.from(order);
+  }
+
+  /**
+   * ClientOrderId로 주문 조회 (멱등성 체크용)
+   */
+  public OrderResponse getOrderByClientOrderId(Long userId, String clientOrderId) {
+    Order order = orderRepository.findByUserIdAndClientOrderId(userId, clientOrderId)
+        .orElseThrow(() -> new OrderNotFoundException("ClientOrderId: " + clientOrderId));
+
+    // ClientOrderId 조회도 본인 확인 필요
     validateUserAccess(order, userId);
     return OrderResponse.from(order);
   }

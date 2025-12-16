@@ -34,7 +34,7 @@ public class OrderController {
         private final OrderService orderService;
 
         /** 신규 주문 생성 */
-        @PostMapping
+        @PostMapping("/create")
         public ResponseEntity<OrderService.OrderCreateResponse> createOrder(
                         @Valid @RequestBody OrderCreateRequest request,
                         @AuthenticationPrincipal Long userId) {

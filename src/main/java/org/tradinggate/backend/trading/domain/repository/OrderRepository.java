@@ -37,4 +37,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
   long countPendingOrdersBySymbol(@Param("userId") Long userId, @Param("symbol") String symbol);
 
   Optional<Order> findByUserIdAndClientOrderId(Long userId, String clientOrderId);
+
+  @Query("SELECT o FROM Order o WHERE o.userId = :userId " +
+      "AND (:symbol IS NULL OR o.symbol = :symbol) " +
+      "AND (:status IS NULL OR o.status = :status) " +
+      "AND (cast(:startDate as timestamp) IS NULL OR o.createdAt >= :startDate) " +
+      "AND (cast(:endDate as timestamp) IS NULL OR o.createdAt <= :endDate) " +
+      "ORDER BY o.createdAt DESC")
+  Page<Order> findByConditions(
+      @Param("userId") Long userId,
+      @Param("symbol") String symbol,
+      @Param("status") OrderStatus status,
+      @Param("startDate") LocalDateTime startDate,
+      @Param("endDate") LocalDateTime endDate,
+      Pageable pageable);
 }

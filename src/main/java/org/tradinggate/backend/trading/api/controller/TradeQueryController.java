@@ -19,14 +19,6 @@ import java.util.List;
  * 역할:
  * - Trading DB에서 체결 내역 조회
  *
- * TODO:
- * [ ] GET /api/trades - 체결 목록 조회
- * - Query Params: userId, symbol, orderId, startDate, endDate
- * - TradeQueryService.getTrades() 호출 (TradeQueryService 생성 필요)
- * - Pagination 지원
- *
- * [ ] GET /api/trades/{tradeId} - 단일 체결 조회 (선택)
- *
  * 참고: PDF 1-3 (trades.executed 구조)
  */
 @RestController
