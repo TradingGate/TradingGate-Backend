@@ -9,16 +9,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradinggate.backend.matching.domain.MatchFill;
-import org.tradinggate.backend.matching.domain.Order;
-import org.tradinggate.backend.matching.domain.OrderUpdate;
-import org.tradinggate.backend.matching.domain.e.OrderSide;
-import org.tradinggate.backend.matching.domain.e.OrderStatus;
-import org.tradinggate.backend.matching.domain.e.OrderType;
-import org.tradinggate.backend.matching.domain.e.TimeInForce;
-import org.tradinggate.backend.matching.service.KafkaMatchingEventPublisher;
-import org.tradinggate.backend.matching.service.KafkaMessageProducer;
-import org.tradinggate.backend.matching.util.MatchingProperties;
+import org.tradinggate.backend.matching.engine.model.MatchFill;
+import org.tradinggate.backend.matching.engine.model.Order;
+import org.tradinggate.backend.matching.engine.model.OrderUpdate;
+import org.tradinggate.backend.matching.engine.model.e.OrderSide;
+import org.tradinggate.backend.matching.engine.model.e.OrderStatus;
+import org.tradinggate.backend.matching.engine.model.e.OrderType;
+import org.tradinggate.backend.matching.engine.model.e.TimeInForce;
+import org.tradinggate.backend.matching.engine.service.KafkaMatchingEventPublisher;
+import org.tradinggate.backend.matching.engine.service.KafkaMessageProducer;
+import org.tradinggate.backend.matching.engine.util.MatchingProperties;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +36,10 @@ class KafkaMatchingEventPublisherTest {
 
     // ObjectMapper는 진짜 인스턴스 사용 (직렬화/역직렬화 검증용)
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+
+    private static final String SOURCE_TOPIC = "orders.in-test";
+    private static final int SOURCE_PARTITION = 0;
+    private static final long SOURCE_OFFSET = 123L;
 
     @Test
     @DisplayName("orders.updated - 단일 OrderUpdate가 올바른 topic/key/payload로 발행된다")
@@ -87,7 +91,7 @@ class KafkaMatchingEventPublisherTest {
         );
 
         // when
-        publisher.publishOrderUpdates(symbol, List.of(update));
+        publisher.publishOrderUpdates(symbol, List.of(update), SOURCE_TOPIC, SOURCE_PARTITION, SOURCE_OFFSET);
 
         // then
         ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
@@ -95,7 +99,7 @@ class KafkaMatchingEventPublisherTest {
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
 
         verify(kafkaMessageProducer, times(1))
-                .send(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
+                .sendAndWait(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
 
         String topic = topicCaptor.getValue();
         String key = keyCaptor.getValue();
@@ -105,14 +109,20 @@ class KafkaMatchingEventPublisherTest {
         assertThat(key).isEqualTo(String.valueOf(accountId));
 
         JsonNode json = objectMapper.readTree(payload);
-        assertThat(json.get("orderId").asLong()).isEqualTo(orderId);
-        assertThat(json.get("accountId").asLong()).isEqualTo(accountId);
-        assertThat(json.get("clientOrderId").asText()).isEqualTo(clientOrderId);
+        assertThat(json.get("sourceTopic").asText()).isEqualTo(SOURCE_TOPIC);
+        assertThat(json.get("sourcePartition").asInt()).isEqualTo(SOURCE_PARTITION);
+        assertThat(json.get("sourceOffset").asLong()).isEqualTo(SOURCE_OFFSET);
         assertThat(json.get("symbol").asText()).isEqualTo(symbol);
-        assertThat(json.get("newStatus").asText()).isEqualTo(order.getStatus().name());
-        assertThat(json.get("previousStatus").asText()).isEqualTo(previousStatus.name());
-        assertThat(json.get("eventType").asText()).isEqualTo(eventType);
-        assertThat(json.get("eventSeq").asLong()).isEqualTo(eventSeq);
+
+        JsonNode body = json.get("body");
+        assertThat(body).isNotNull();
+        assertThat(body.get("orderId").asLong()).isEqualTo(orderId);
+        assertThat(body.get("accountId").asLong()).isEqualTo(accountId);
+        assertThat(body.get("clientOrderId").asText()).isEqualTo(clientOrderId);
+        assertThat(body.get("symbol").asText()).isEqualTo(symbol);
+        assertThat(body.get("newStatus").asText()).isEqualTo(order.getStatus().name());
+        assertThat(body.get("previousStatus").asText()).isEqualTo(previousStatus.name());
+        assertThat(body.get("eventType").asText()).isEqualTo(eventType);
     }
 
     @Test
@@ -181,7 +191,7 @@ class KafkaMatchingEventPublisherTest {
         );
 
         // when
-        publisher.publishMatchFills(symbol, List.of(fill));
+        publisher.publishMatchFills(symbol, List.of(fill), SOURCE_TOPIC, SOURCE_PARTITION, SOURCE_OFFSET);
 
         // then
         ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
@@ -189,7 +199,7 @@ class KafkaMatchingEventPublisherTest {
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
 
         verify(kafkaMessageProducer, times(2))
-                .send(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
+                .sendAndWait(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
 
         List<String> topics = topicCaptor.getAllValues();
         List<String> keys = keyCaptor.getAllValues();
@@ -208,35 +218,44 @@ class KafkaMatchingEventPublisherTest {
         //    - 두 이벤트 모두 symbol, matchId, trade 가격/수량은 동일
         for (String payload : payloads) {
             JsonNode json = objectMapper.readTree(payload);
+            assertThat(json.get("sourceTopic").asText()).isEqualTo(SOURCE_TOPIC);
+            assertThat(json.get("sourcePartition").asInt()).isEqualTo(SOURCE_PARTITION);
+            assertThat(json.get("sourceOffset").asLong()).isEqualTo(SOURCE_OFFSET);
             assertThat(json.get("symbol").asText()).isEqualTo(symbol);
-            assertThat(json.get("matchId").asLong()).isEqualTo(matchId);
-            assertThat(json.get("execQuantity").asText()).isEqualTo(String.valueOf(tradeQty));
-            assertThat(json.get("execPrice").asText()).isEqualTo(String.valueOf(tradePrice));
 
-            // 이벤트 ID는 UUID 기반 문자열인지 정도만 가볍게 체크
-            assertThat(json.get("eventId").asText()).startsWith("tradeEventID-");
+            JsonNode body = json.get("body");
+            assertThat(body.get("matchId").asLong()).isEqualTo(matchId);
+            assertThat(body.get("execQuantity").asText()).isEqualTo(String.valueOf(tradeQty));
+            assertThat(body.get("execPrice").asText()).isEqualTo(String.valueOf(tradePrice));
+            assertThat(body.get("eventId").asText()).startsWith("tradeEventID-");
         }
 
         // 4) taker 이벤트 / maker 이벤트 각각 검증 (side, liquidityFlag 등)
         JsonNode event1 = objectMapper.readTree(payloads.get(0));
         JsonNode event2 = objectMapper.readTree(payloads.get(1));
 
-        // userId / side / liquidityFlag 가 서로 반대가 되는지 정도 확인
-        if (event1.get("userId").asLong() == takerAccountId) {
-            assertThat(event1.get("side").asText()).isEqualTo(OrderSide.BUY.name());
-            assertThat(event1.get("liquidityFlag").asText()).isEqualTo("TAKER");
+        JsonNode body1 = event1.get("body");
+        JsonNode body2 = event2.get("body");
 
-            assertThat(event2.get("userId").asLong()).isEqualTo(makerAccountId);
-            assertThat(event2.get("side").asText()).isEqualTo(OrderSide.SELL.name());
-            assertThat(event2.get("liquidityFlag").asText()).isEqualTo("MAKER");
+        if (body1.get("userId").asLong() == takerAccountId) {
+            assertThat(event1.get("side").asText()).isEqualTo("TAKER");
+            assertThat(body1.get("side").asText()).isEqualTo(OrderSide.BUY.name());
+            assertThat(body1.get("liquidityFlag").asText()).isEqualTo("TAKER");
+
+            assertThat(body2.get("userId").asLong()).isEqualTo(makerAccountId);
+            assertThat(event2.get("side").asText()).isEqualTo("MAKER");
+            assertThat(body2.get("side").asText()).isEqualTo(OrderSide.SELL.name());
+            assertThat(body2.get("liquidityFlag").asText()).isEqualTo("MAKER");
         } else {
-            assertThat(event1.get("userId").asLong()).isEqualTo(makerAccountId);
-            assertThat(event1.get("side").asText()).isEqualTo(OrderSide.SELL.name());
-            assertThat(event1.get("liquidityFlag").asText()).isEqualTo("MAKER");
+            assertThat(body1.get("userId").asLong()).isEqualTo(makerAccountId);
+            assertThat(event1.get("side").asText()).isEqualTo("MAKER");
+            assertThat(body1.get("side").asText()).isEqualTo(OrderSide.SELL.name());
+            assertThat(body1.get("liquidityFlag").asText()).isEqualTo("MAKER");
 
-            assertThat(event2.get("userId").asLong()).isEqualTo(takerAccountId);
-            assertThat(event2.get("side").asText()).isEqualTo(OrderSide.BUY.name());
-            assertThat(event2.get("liquidityFlag").asText()).isEqualTo("TAKER");
+            assertThat(body2.get("userId").asLong()).isEqualTo(takerAccountId);
+            assertThat(event2.get("side").asText()).isEqualTo("TAKER");
+            assertThat(body2.get("side").asText()).isEqualTo(OrderSide.BUY.name());
+            assertThat(body2.get("liquidityFlag").asText()).isEqualTo("TAKER");
         }
     }
 
@@ -254,11 +273,11 @@ class KafkaMatchingEventPublisherTest {
         String symbol = "BTCUSDT";
 
         // when
-        publisher.publishOrderUpdates(symbol, List.of());
+        publisher.publishOrderUpdates(symbol, List.of(), SOURCE_TOPIC, SOURCE_PARTITION, SOURCE_OFFSET);
 
         // then
         verify(kafkaMessageProducer, times(0))
-                .send(anyString(), anyString(), anyString());
+                .sendAndWait(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -275,11 +294,11 @@ class KafkaMatchingEventPublisherTest {
         String symbol = "BTCUSDT";
 
         // when
-        publisher.publishMatchFills(symbol, List.of());
+        publisher.publishMatchFills(symbol, List.of(), SOURCE_TOPIC, SOURCE_PARTITION, SOURCE_OFFSET);
 
         // then
         verify(kafkaMessageProducer, times(0))
-                .send(anyString(), anyString(), anyString());
+                .sendAndWait(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -352,7 +371,7 @@ class KafkaMatchingEventPublisherTest {
         );
 
         // when
-        publisher.publishOrderUpdates(symbol, List.of(update1, update2));
+        publisher.publishOrderUpdates(symbol, List.of(update1, update2), SOURCE_TOPIC, SOURCE_PARTITION, SOURCE_OFFSET);
 
         // then
         ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
@@ -360,7 +379,7 @@ class KafkaMatchingEventPublisherTest {
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
 
         verify(kafkaMessageProducer, times(2))
-                .send(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
+                .sendAndWait(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
 
         List<String> topics = topicCaptor.getAllValues();
         List<String> keys = keyCaptor.getAllValues();
@@ -379,8 +398,13 @@ class KafkaMatchingEventPublisherTest {
         JsonNode json1 = objectMapper.readTree(payloads.get(0));
         JsonNode json2 = objectMapper.readTree(payloads.get(1));
 
-        assertThat(List.of(json1.get("accountId").asLong(), json2.get("accountId").asLong()))
-                .containsExactlyInAnyOrder(accountId1, accountId2);
+        assertThat(json1.get("sourceTopic").asText()).isEqualTo(SOURCE_TOPIC);
+        assertThat(json2.get("sourceTopic").asText()).isEqualTo(SOURCE_TOPIC);
+
+        long a1 = json1.get("body").get("accountId").asLong();
+        long a2 = json2.get("body").get("accountId").asLong();
+
+        assertThat(List.of(a1, a2)).containsExactlyInAnyOrder(accountId1, accountId2);
     }
 
     @Test
@@ -459,7 +483,7 @@ class KafkaMatchingEventPublisherTest {
         );
 
         // when
-        publisher.publishMatchFills(symbol, List.of(fill1, fill2));
+        publisher.publishMatchFills(symbol, List.of(fill1, fill2), SOURCE_TOPIC, SOURCE_PARTITION, SOURCE_OFFSET);
 
         // then
         ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
@@ -467,7 +491,7 @@ class KafkaMatchingEventPublisherTest {
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
 
         verify(kafkaMessageProducer, times(4))
-                .send(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
+                .sendAndWait(topicCaptor.capture(), keyCaptor.capture(), payloadCaptor.capture());
 
         List<String> topics = topicCaptor.getAllValues();
         List<String> keys = keyCaptor.getAllValues();
@@ -486,8 +510,9 @@ class KafkaMatchingEventPublisherTest {
         for (String payload : payloads) {
             JsonNode json = objectMapper.readTree(payload);
             assertThat(json.get("symbol").asText()).isEqualTo(symbol);
-            assertThat(json.get("execQuantity").asText()).isEqualTo(String.valueOf(tradeQty));
-            assertThat(json.get("execPrice").asText()).isEqualTo(String.valueOf(tradePrice));
+            JsonNode body = json.get("body");
+            assertThat(body.get("execQuantity").asText()).isEqualTo(String.valueOf(tradeQty));
+            assertThat(body.get("execPrice").asText()).isEqualTo(String.valueOf(tradePrice));
         }
     }
 }

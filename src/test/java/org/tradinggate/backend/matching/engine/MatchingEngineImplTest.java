@@ -1,11 +1,13 @@
 package org.tradinggate.backend.matching.engine;
 
 import org.junit.jupiter.api.Test;
-import org.tradinggate.backend.matching.domain.*;
-import org.tradinggate.backend.matching.domain.e.OrderSide;
-import org.tradinggate.backend.matching.domain.e.OrderType;
-import org.tradinggate.backend.matching.domain.e.TimeInForce;
-import org.tradinggate.backend.matching.domain.CancelTarget;
+import org.tradinggate.backend.matching.engine.kafka.PartitionCountProvider;
+import org.tradinggate.backend.matching.engine.kafka.TopicPartitionCountProvider;
+import org.tradinggate.backend.matching.engine.model.*;
+import org.tradinggate.backend.matching.engine.model.e.OrderSide;
+import org.tradinggate.backend.matching.engine.model.e.OrderType;
+import org.tradinggate.backend.matching.engine.model.e.TimeInForce;
+import org.tradinggate.backend.matching.engine.service.MatchingEngineImpl;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -20,7 +22,9 @@ class MatchingEngineImplTest {
     @Test
     void newBuyOrder_withoutOppositeOrders_shouldBeAddedToOrderBook() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand buyCmd = OrderCommand.newOrder(
@@ -43,7 +47,7 @@ class MatchingEngineImplTest {
         assertTrue(result.getMatchFills().isEmpty(), "체결은 없어야 함");
         assertEquals(1, result.getOrderUpdates().size(), "CREATED 이벤트 1건 정도 기대");
 
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertNotNull(book);
 
         Optional<Order> bestBidOpt = book.bestBid();
@@ -61,7 +65,9 @@ class MatchingEngineImplTest {
     @Test
     void newBuyOrder_crossesExistingSell_shouldMatchAndLeaveRestOnBook() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand sellCmd = OrderCommand.newOrder(
@@ -102,7 +108,7 @@ class MatchingEngineImplTest {
         assertEquals(1L, fill.getQuantity());
 
         // 2) taker는 전량 체결 → 오더북 BUY 측엔 남지 않아야 함
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertTrue(book.bestBid().isEmpty(), "BUY 쪽 오더는 없어야 함");
 
         // 3) maker는 2 중 1만 체결 → 잔량 1 남아야 함
@@ -121,7 +127,9 @@ class MatchingEngineImplTest {
     @Test
     void buyTaker_shouldMatchMultipleSellMakers_untilQuantityConsumed() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand sell1 = OrderCommand.newOrder(
@@ -177,7 +185,7 @@ class MatchingEngineImplTest {
         assertTrue(result.getMatchFills().size() >= 2, "두 레벨 이상 체결되어야 함");
 
         // 2) BUY taker는 전량 체결 → 오더북 BUY 쪽 비어야 함
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertTrue(book.bestBid().isEmpty(), "BUY 쪽은 비어야 함");
 
         // 3) SELL 쪽도 모두 소진 → 오더북 SELL 쪽도 비어야 함
@@ -190,7 +198,9 @@ class MatchingEngineImplTest {
     @Test
     void cancelPartiallyFilledOrder_shouldRemoveRemainingQuantityFromOrderBook() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand sellCmd = OrderCommand.newOrder(
@@ -243,7 +253,7 @@ class MatchingEngineImplTest {
         assertFalse(cancelResult.getOrderUpdates().isEmpty(), "취소 이벤트가 있어야 함");
 
         // 2) 해당 심볼 오더북에서 SELL 잔량이 제거되었는지 확인
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertTrue(book.bestAsk().isEmpty(), "CANCEL 이후 SELL 쪽 잔량이 없어야 함");
     }
 
@@ -256,7 +266,9 @@ class MatchingEngineImplTest {
     @Test
     void sellAboveBestBid_shouldRestOnAskBookWithoutMatch() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand buy = OrderCommand.newOrder(
@@ -292,7 +304,7 @@ class MatchingEngineImplTest {
         // then
         assertTrue(result.getMatchFills().isEmpty(), "체결이 없어야 함");
 
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertNotNull(book);
 
         // BUY는 그대로 남아야 함
@@ -319,7 +331,9 @@ class MatchingEngineImplTest {
     @Test
     void largeBuy_shouldLeaveRemainingOnBidBook() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand sell = OrderCommand.newOrder(
@@ -358,7 +372,7 @@ class MatchingEngineImplTest {
         assertEquals(1L, result.getMatchFills().get(0).getQuantity());
 
         // 오더북 확인: SELL은 비어야 하고 BUY 잔량 2가 남아야 함
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertTrue(book.bestAsk().isEmpty(), "SELL 쪽은 비어야 함");
 
         var bestBidOpt = book.bestBid();
@@ -374,7 +388,9 @@ class MatchingEngineImplTest {
     @Test
     void samePriceSellOrders_shouldRespectTimePriority() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand sell1 = OrderCommand.newOrder(
@@ -428,7 +444,7 @@ class MatchingEngineImplTest {
         assertEquals(2001L, fill.getMakerAccountId());
 
         // 오더북에는 두 번째 SELL만 남아야 함
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         var bestAskOpt = book.bestAsk();
         assertTrue(bestAskOpt.isPresent());
         Order remainingAsk = bestAskOpt.get();
@@ -443,7 +459,9 @@ class MatchingEngineImplTest {
     @Test
     void cancelNonExistingOrder_shouldNotChangeOrderBook() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand buy = OrderCommand.newOrder(
@@ -460,7 +478,7 @@ class MatchingEngineImplTest {
         );
         engine.handle(buy, now);
 
-        OrderBook bookBefore = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook bookBefore = orderBookRegistry.find("BTCUSDT").get();
         var bestBidBefore = bookBefore.bestBid();
         var bestAskBefore = bookBefore.bestAsk();
 
@@ -479,7 +497,7 @@ class MatchingEngineImplTest {
 
         // then
         // 예외 없이 지나가야 하고, 오더북 상태는 그대로여야 한다.
-        OrderBook bookAfter = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook bookAfter = orderBookRegistry.find("BTCUSDT").get();
 
         var bestBidAfter = bookAfter.bestBid();
         var bestAskAfter = bookAfter.bestAsk();
@@ -507,7 +525,9 @@ class MatchingEngineImplTest {
     @Test
     void duplicateNewOrder_shouldBeIdempotentAndNotCreateDuplicateBookEntries() {
         // given
-        MatchingEngineImpl engine = new MatchingEngineImpl();
+        PartitionCountProvider provider = topic -> 12;
+        OrderBookRegistry orderBookRegistry = new OrderBookRegistry(provider);
+        MatchingEngineImpl engine = new MatchingEngineImpl(orderBookRegistry);
         long now = System.currentTimeMillis();
 
         OrderCommand firstBuy = OrderCommand.newOrder(
@@ -564,13 +584,13 @@ class MatchingEngineImplTest {
         assertEquals(1L, fill.getQuantity(), "실제 유효 주문 수량(1)만 체결되어야 함");
 
         // 오더북 BUY는 비어 있어야 한다.
-        OrderBook book = engine.getOrderBooks().get("BTCUSDT");
+        OrderBook book = orderBookRegistry.find("BTCUSDT").get();
         assertTrue(book.bestBid().isEmpty(), "BUY 쪽은 비어 있어야 함");
     }
 
     private void logOrderBook(String title, MatchingEngineImpl engine, String symbol) {
         System.out.println("==== " + title + " ====");
-        OrderBook book = engine.getOrderBooks().get(symbol);
+        OrderBook book = engine.getOrderBookRegistry().find(symbol).get();
         if (book == null) {
             System.out.println("OrderBook for " + symbol + " is null");
             return;

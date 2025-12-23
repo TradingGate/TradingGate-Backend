@@ -136,6 +136,15 @@ tradinggate:
     orders-updated-topic: orders.updated
     risk-commands-topic: risk.commands
     partitioning-key: symbol
+    orders-in-partitions: 12
+    base-dir: ${TRADINGGATE_SNAPSHOT_BASE_DIR:/data/tradinggate}
+    fallback-count: 5
+  kafka:
+    admin:
+      request-timeout-ms: 3000
+      cache-ttl-ms: 30000
+      fallback-partitions: 12
+
 
 # ============================================
 #  Profile: risk
