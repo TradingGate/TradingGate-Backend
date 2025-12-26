@@ -28,6 +28,7 @@ import org.tradinggate.backend.matching.snapshot.io.SnapshotPathResolver;
 import org.tradinggate.backend.matching.snapshot.restore.PartitionStateService;
 import org.tradinggate.backend.matching.snapshot.restore.SnapshotLoader;
 import org.tradinggate.backend.matching.snapshot.shutdown.AssignedPartitionTracker;
+import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotRestorer;
 
 import java.util.HashMap;
@@ -124,12 +125,13 @@ public class KafkaConfig {
             ObjectMapper objectMapper,
             OrderBookRegistry registry,
             PartitionCountProvider partitionCountProvider,
-            SnapshotCoordinator snapshotCoordinator
+            SnapshotCoordinator snapshotCoordinator,
+            PartitionOffsetTracker tracker
     ){
         SnapshotPathResolver pathResolver = new SnapshotPathResolver(matchingProperties.getBaseDir());
         SnapshotLoader snapshotLoader = new SnapshotLoader(pathResolver, objectMapper, matchingProperties.getFallbackCount());
         SnapshotRestorer snapshotRestorer = new SnapshotRestorer();
 
-        return new PartitionStateService(snapshotLoader, snapshotRestorer, registry, partitionCountProvider, snapshotCoordinator);
+        return new PartitionStateService(snapshotLoader, snapshotRestorer, registry, partitionCountProvider, snapshotCoordinator, tracker);
     }
 }

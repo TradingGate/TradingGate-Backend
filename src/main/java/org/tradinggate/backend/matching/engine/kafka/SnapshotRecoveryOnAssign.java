@@ -62,14 +62,14 @@ public class SnapshotRecoveryOnAssign implements ConsumerAwareRebalanceListener 
 
     @Override
     public void onPartitionsRevokedAfterCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions) {
-        tracker.onUnassigned(partitions);
         cleanupOnUnassign(partitions, "revokedAfterCommit");
+        tracker.onUnassigned(partitions);
     }
 
     @Override
     public void onPartitionsLost(Consumer<?, ?> consumer, Collection<TopicPartition> partitions) {
-        tracker.onUnassigned(partitions);
         cleanupOnUnassign(partitions, "lost");
+        tracker.onUnassigned(partitions);
     }
 
     private void cleanupOnUnassign(Collection<TopicPartition> partitions, String reason) {

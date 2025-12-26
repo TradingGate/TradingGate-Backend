@@ -17,4 +17,8 @@ public class PartitionOffsetTracker {
     public long getLastProcessedOffset(String topic, int partition) {
         return lastProcessedOffset.getOrDefault(new TopicPartition(topic, partition), -1L);
     }
+
+    public void clear(String topic, int partition) {
+        lastProcessedOffset.remove(new TopicPartition(topic, partition));
+    }
 }

@@ -23,7 +23,7 @@ import static org.tradinggate.backend.matching.engine.util.KafkaJsonUtil.buildTa
 @RequiredArgsConstructor
 public class KafkaMatchingEventPublisher implements MatchingEventPublisher {
 
-    private final KafkaMessageProducer kafkaMessageProducer; // send()가 Future/SendResult 리턴하도록 수정 권장
+    private final KafkaMessageProducer kafkaMessageProducer;
     private final ObjectMapper objectMapper;
     private final MatchingProperties matchingProperties;
 
@@ -43,7 +43,6 @@ public class KafkaMatchingEventPublisher implements MatchingEventPublisher {
             try {
                 String key = String.valueOf(update.getAccountId());
 
-                // ✅ idempotency/trace: source 정보를 payload에 포함
                 Map<String, Object> envelope = Map.of(
                         "sourceTopic", sourceTopic,
                         "sourcePartition", sourcePartition,
@@ -54,11 +53,10 @@ public class KafkaMatchingEventPublisher implements MatchingEventPublisher {
 
                 String payload = objectMapper.writeValueAsString(envelope);
 
-                // ✅ 동기 완료 보장: 실패하면 예외 던져야 함
                 kafkaMessageProducer.sendAndWait(topic, key, payload);
 
             } catch (Exception e) {
-                // ✅ swallow 금지
+                //  swallow 금지
                 throw new RuntimeException("Failed to publish OrderUpdate. symbol=" + symbol
                         + ", source=" + sourceTopic + "-" + sourcePartition + "@" + sourceOffset, e);
             }

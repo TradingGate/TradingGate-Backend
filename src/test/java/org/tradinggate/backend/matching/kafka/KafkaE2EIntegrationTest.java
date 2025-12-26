@@ -357,7 +357,7 @@ class KafkaE2EIntegrationTest {
             assertTrue(calls.get() >= 2, "expected sendAndWait to be attempted at least twice (fail once then succeed)");
         });
 
-        // ✅ Stronger + less flaky: verify retry by inspecting the payload actually passed to producer.
+        //  Stronger + less flaky: verify retry by inspecting the payload actually passed to producer.
         // We don't rely on a separate output consumer here.
         ArgumentCaptor<String> topicCap = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> keyCap = ArgumentCaptor.forClass(String.class);
@@ -436,7 +436,7 @@ class KafkaE2EIntegrationTest {
         long off2 = m2.offset();
         assertEquals(off1 + 1, off2, "expected sequential offsets in same partition");
 
-        // ✅ Verify ordering via producer spy: we should not publish events for off2 before off1 is successfully published.
+        //  Verify ordering via producer spy: we should not publish events for off2 before off1 is successfully published.
         ArgumentCaptor<String> payloadCap = ArgumentCaptor.forClass(String.class);
 
         await().atMost(20, TimeUnit.SECONDS).untilAsserted(() -> {

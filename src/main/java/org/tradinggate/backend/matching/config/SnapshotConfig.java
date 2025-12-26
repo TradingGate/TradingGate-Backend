@@ -1,4 +1,4 @@
-package org.tradinggate.backend.global.config;
+package org.tradinggate.backend.matching.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.tradinggate.backend.global.config.SnapshotProperties;
 import org.tradinggate.backend.matching.snapshot.io.AtomicFileWriter;
 import org.tradinggate.backend.matching.snapshot.io.LocalSnapshotFileStore;
 import org.tradinggate.backend.matching.snapshot.io.SnapshotPathResolver;

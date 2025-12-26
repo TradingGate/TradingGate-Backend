@@ -43,10 +43,8 @@ public class OrdersInKafkaListener {
         try {
             OrderCommand command = parseOrderCommand(objectMapper, payload);
 
-            // 심볼이 없거나 잘못된 경우는 그냥 버린다. (향후 REJECT 이벤트로 바꿀 수 있음)
             if (command.getSymbol() == null || command.getSymbol().isBlank()) {
-                log.warn("Invalid symbol in orders.in message. topic={}, partition={}, offset={}, payload={}",
-                        topic, partition, offset, payload);
+                log.warn("Invalid symbol in orders.in message. topic={}, partition={}, offset={}, payload={}", topic, partition, offset, payload);
                 ack.acknowledge();
                 return;
             }

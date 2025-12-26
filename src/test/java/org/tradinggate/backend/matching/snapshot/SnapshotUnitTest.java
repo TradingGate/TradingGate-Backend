@@ -18,6 +18,7 @@ import org.tradinggate.backend.matching.snapshot.model.e.SnapshotTriggerReason;
 import org.tradinggate.backend.matching.snapshot.restore.PartitionStateService;
 import org.tradinggate.backend.matching.snapshot.restore.SnapshotLoader;
 import org.tradinggate.backend.matching.snapshot.retention.SnapshotRetentionManager;
+import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotAssembler;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotCryptoUtils;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotFileNameParser;
@@ -193,7 +194,8 @@ public class SnapshotUnitTest {
         SnapshotWriteQueue writeQueue = new SnapshotWriteQueue(10000, worker);
         SnapshotCoordinator coordinator = new SnapshotCoordinator(registry, assembler, writeQueue);
 
-        PartitionStateService svc = new PartitionStateService(loader, restorer, registry, countProvider, coordinator);
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
+        PartitionStateService svc = new PartitionStateService(loader, restorer, registry, countProvider, coordinator, offsetTracker);
 
         PartitionRecoveryResult rr = svc.recoverOnPartitionAssigned(topic, partition, () -> true);
 

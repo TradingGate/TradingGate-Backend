@@ -22,6 +22,7 @@ import org.tradinggate.backend.matching.snapshot.restore.PartitionStateService;
 import org.tradinggate.backend.matching.snapshot.restore.SnapshotLoader;
 import org.tradinggate.backend.matching.snapshot.retention.SnapshotRetentionManager;
 import org.tradinggate.backend.matching.snapshot.shutdown.AssignedPartitionTracker;
+import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotAssembler;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotCryptoUtils;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotFileNameParser;
@@ -148,7 +149,8 @@ public class RebalanceScenarioIntegrationTest {
     ) {
         SnapshotLoader loader = new SnapshotLoader(resolver, om, 5);
         SnapshotRestorer restorer = new SnapshotRestorer();
-        return new PartitionStateService(loader, restorer, registry, countProvider, coordinator);
+        PartitionOffsetTracker tracker = new PartitionOffsetTracker();
+        return new PartitionStateService(loader, restorer, registry, countProvider, coordinator, tracker);
     }
 
     private static String pickSymbolForPartition(int targetPartition, int partitionCount, String prefix) {
@@ -239,12 +241,14 @@ public class RebalanceScenarioIntegrationTest {
             return inv.callRealMethod();
         }).when(slowLoader).loadLatest(eq(topic), eq(partition));
 
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService state = new PartitionStateService(
                 slowLoader,
                 new SnapshotRestorer(),
                 registry,
                 countProvider,
-                coordinator
+                coordinator,
+                offsetTracker
         );
 
         AssignedPartitionTracker tracker = new AssignedPartitionTracker();
@@ -318,13 +322,14 @@ public class RebalanceScenarioIntegrationTest {
                 ChecksumAlgorithm.SHA_256,
                 ps
         ));
-
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService state = new PartitionStateService(
                 new SnapshotLoader(resolver, om, 5),
                 new SnapshotRestorer(),
                 registry,
                 countProvider,
-                coordinator
+                coordinator,
+                offsetTracker
         );
 
         @SuppressWarnings("unchecked")
@@ -531,7 +536,8 @@ public class RebalanceScenarioIntegrationTest {
 
         // now run recovery with fallbackCount >= 3
         SnapshotLoader loader = new SnapshotLoader(resolver, om, 10);
-        PartitionStateService state = new PartitionStateService(loader, new SnapshotRestorer(), registry, countProvider, coordinator);
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
+        PartitionStateService state = new PartitionStateService(loader, new SnapshotRestorer(), registry, countProvider, coordinator, offsetTracker);
 
         @SuppressWarnings("unchecked")
         Consumer<Object, Object> consumer = mock(Consumer.class);
@@ -599,12 +605,14 @@ public class RebalanceScenarioIntegrationTest {
         ));
 
         SnapshotCoordinator coordinator = new SnapshotCoordinator(registry, new SnapshotAssembler("engine-test"), buildWriteQueue(resolver, om));
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService state = new PartitionStateService(
                 new SnapshotLoader(resolver, om, 10),
                 new SnapshotRestorer(),
                 registry,
                 countProviderNow,
-                coordinator
+                coordinator,
+                offsetTracker
         );
 
         @SuppressWarnings("unchecked")

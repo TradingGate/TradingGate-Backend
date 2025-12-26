@@ -10,6 +10,7 @@ import org.tradinggate.backend.matching.snapshot.dto.LoadedSnapshot;
 import org.tradinggate.backend.matching.snapshot.dto.PartitionCleanupResult;
 import org.tradinggate.backend.matching.snapshot.dto.PartitionRecoveryResult;
 import org.tradinggate.backend.matching.snapshot.dto.RecoveredOne;
+import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotCryptoUtils;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotRestorer;
 
@@ -25,6 +26,7 @@ public class PartitionStateService {
     private final OrderBookRegistry orderBookRegistry;
     private final PartitionCountProvider partitionCountProvider;
     private final SnapshotCoordinator snapshotCoordinator;
+    private final PartitionOffsetTracker offsetTracker;
 
     public PartitionRecoveryResult recoverOnPartitionAssigned(String topic, int partition, BooleanSupplier isStillCurrent) {
         if (topic == null || topic.isBlank()) return PartitionRecoveryResult.none();
@@ -90,8 +92,17 @@ public class PartitionStateService {
         if (topic == null || topic.isBlank()) return PartitionCleanupResult.none(reason);
         if (partition < 0) return PartitionCleanupResult.none(reason);
 
+        if ("revokedAfterCommit".equals(reason)) {
+            long lastProcessedOffset = offsetTracker.getLastProcessedOffset(topic, partition);
+            if (lastProcessedOffset >= 0) {
+                snapshotCoordinator.forceSnapshot(topic, partition, lastProcessedOffset, System.currentTimeMillis());
+            }
+        }
+
         List<String> removedSymbols = orderBookRegistry.removeAllByPartition(topic, partition);
         snapshotCoordinator.clearPolicyForPartition(partition);
+
+        offsetTracker.clear(topic, partition);
 
         log.info("[SNAPSHOT] {} cleanup topic={}, partition={}, removedSymbolsCount={}",
                 reason, topic, partition, removedSymbols.size());

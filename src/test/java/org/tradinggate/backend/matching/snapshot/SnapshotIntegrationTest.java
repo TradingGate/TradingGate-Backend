@@ -24,6 +24,7 @@ import org.tradinggate.backend.matching.snapshot.restore.PartitionStateService;
 import org.tradinggate.backend.matching.snapshot.restore.SnapshotLoader;
 import org.tradinggate.backend.matching.snapshot.retention.SnapshotRetentionManager;
 import org.tradinggate.backend.matching.snapshot.shutdown.AssignedPartitionTracker;
+import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotAssembler;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotCryptoUtils;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotFileNameParser;
@@ -86,8 +87,9 @@ public class SnapshotIntegrationTest {
 
         SnapshotLoader loader = new SnapshotLoader(resolver, om, 5);
         SnapshotRestorer restorer = new SnapshotRestorer();
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService partitionStateService =
-                new PartitionStateService(loader, restorer, registry, countProvider, coordinator);
+                new PartitionStateService(loader, restorer, registry, countProvider, coordinator, offsetTracker);
 
         // when: force snapshot -> 실제 파일 저장
         coordinator.forceSnapshot(topic, partition, offset, now);
@@ -145,8 +147,9 @@ public class SnapshotIntegrationTest {
         // recovery stack
         SnapshotLoader loader = new SnapshotLoader(resolver, om, 5);
         SnapshotRestorer restorer = new SnapshotRestorer();
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService stateService =
-                new PartitionStateService(loader, restorer, registry, countProvider, coordinator);
+                new PartitionStateService(loader, restorer, registry, countProvider, coordinator, offsetTracker);
 
         // 테스트 대상 파티션 2개
         int p1 = 4;
@@ -253,8 +256,9 @@ public class SnapshotIntegrationTest {
 
         SnapshotLoader loader = new SnapshotLoader(resolver, om, 5);
         SnapshotRestorer restorer = new SnapshotRestorer();
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService stateService =
-                new PartitionStateService(loader, restorer, registry, countProvider, coordinator);
+                new PartitionStateService(loader, restorer, registry, countProvider, coordinator, offsetTracker);
 
         int pHas = 4;
         int pNone = 7;
@@ -319,8 +323,9 @@ public class SnapshotIntegrationTest {
         SnapshotAssembler assembler = new SnapshotAssembler("engine-test");
         SnapshotCoordinator coordinator = new SnapshotCoordinator(registry, assembler, writeQueue);
 
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService stateService =
-                new PartitionStateService(loader, restorer, registry, countProvider, coordinator);
+                new PartitionStateService(loader, restorer, registry, countProvider, coordinator, offsetTracker);
 
         int partition = 4;
 
@@ -471,10 +476,12 @@ public class SnapshotIntegrationTest {
         // coordinator는 여기서 크게 쓰지 않으니 null로 안 두고 더미 제공
         SnapshotCoordinator coordinator = new SnapshotCoordinator(registry, new SnapshotAssembler("engine-v1"), new SnapshotWriteQueue(10, worker));
 
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService svc = new PartitionStateService(
                 loader, restorer, registry,
                 t -> partitionCount,
-                coordinator
+                coordinator,
+                offsetTracker
         );
 
         PartitionRecoveryResult rr = svc.recoverOnPartitionAssigned(topic, partition, () -> true);
@@ -606,7 +613,7 @@ public class SnapshotIntegrationTest {
         SnapshotLoader loader = new SnapshotLoader(resolver, om, 5);
         SnapshotRestorer restorer = new SnapshotRestorer();
 
-        // ✅ provider가 “복구 시점”에 partitionCount=13을 반환하도록 구성 (변경 상황 가정)
+        //  provider가 “복구 시점”에 partitionCount=13을 반환하도록 구성 (변경 상황 가정)
         AtomicInteger call = new AtomicInteger(0);
         PartitionCountProvider changingProvider = t -> (call.incrementAndGet() >= 1 ? 13 : 13);
 
@@ -614,10 +621,12 @@ public class SnapshotIntegrationTest {
 
         SnapshotCoordinator coordinator = new SnapshotCoordinator(registry, new SnapshotAssembler("engine-v1"), new SnapshotWriteQueue(10, worker));
 
+        PartitionOffsetTracker offsetTracker = new PartitionOffsetTracker();
         PartitionStateService svc = new PartitionStateService(
                 loader, restorer, registry,
                 changingProvider::partitionCount,
-                coordinator
+                coordinator,
+                offsetTracker
         );
 
         PartitionRecoveryResult rr = svc.recoverOnPartitionAssigned(topic, partition, () -> true);
