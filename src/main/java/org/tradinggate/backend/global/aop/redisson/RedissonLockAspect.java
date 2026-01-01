@@ -31,26 +31,36 @@ public class RedissonLockAspect {
     private final SpelExpressionParser parser = new SpelExpressionParser();
     private final DefaultParameterNameDiscoverer nameDiscoverer = new DefaultParameterNameDiscoverer();
 
-    @Around("@annotation(redissonLock)")
-    public Object around(ProceedingJoinPoint joinPoint, RedissonLock redissonLock) throws Throwable {
-        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
-        String lockKey = parseKey(redissonLock.key(), method, joinPoint.getArgs());
+  @Around("@annotation(redissonLock)")
+  public Object around(ProceedingJoinPoint joinPoint, RedissonLock redissonLock) throws Throwable {
+    Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+    String lockKey = parseKey(redissonLock.key(), method, joinPoint.getArgs());
 
-        RLock lock = redissonClient.getLock(lockKey);
-        boolean acquired = false;
+    log.info("🔒 [REDISSON] Attempting lock: {}", lockKey);  // 추가
 
-        try {
-            acquired = lock.tryLock(redissonLock.waitTime(), redissonLock.leaseTime(), TimeUnit.SECONDS);
-            if (!acquired) {
-                throw new CustomException(DUPLICATE_REQUEST);
-            }
-            return joinPoint.proceed();
-        } finally {
-            if (acquired && lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
-        }
+    RLock lock = redissonClient.getLock(lockKey);
+    boolean acquired = false;
+
+    try {
+      acquired = lock.tryLock(redissonLock.waitTime(), redissonLock.leaseTime(), TimeUnit.SECONDS);
+      log.info("🔒 [REDISSON] Lock acquired: {} = {}", lockKey, acquired);  // 추가
+
+      if (!acquired) {
+        log.warn("❌ [REDISSON] Failed to acquire lock: {}", lockKey);  // 추가
+        throw new CustomException(DUPLICATE_REQUEST);
+      }
+
+      Object result = joinPoint.proceed();
+      log.info("✅ [REDISSON] Method executed successfully");  // 추가
+      return result;
+
+    } finally {
+      if (acquired && lock.isHeldByCurrentThread()) {
+        lock.unlock();
+        log.info("🔓 [REDISSON] Lock released: {}", lockKey);  // 추가
+      }
     }
+  }
 
     private String parseKey(String keyExpression, Method method, Object[] args) {
         EvaluationContext context = new StandardEvaluationContext();

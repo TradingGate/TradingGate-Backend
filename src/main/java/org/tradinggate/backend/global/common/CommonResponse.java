@@ -13,4 +13,5 @@ public class CommonResponse<T> {
     public static <T> CommonResponse<T> success(T result) {
         return new CommonResponse<>("Success", 200, result);
     }
+
 }

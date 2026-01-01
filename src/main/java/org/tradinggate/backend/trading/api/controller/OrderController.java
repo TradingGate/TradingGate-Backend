@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.tradinggate.backend.global.common.CommonResponse;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.service.OrderService;
@@ -31,35 +32,43 @@ import org.tradinggate.backend.trading.service.OrderService;
 @Validated
 public class OrderController {
 
-        private final OrderService orderService;
+  private final OrderService orderService;
 
-        /** 신규 주문 생성 */
-        @PostMapping("/create")
-        public ResponseEntity<OrderService.OrderCreateResponse> createOrder(
-                        @Valid @RequestBody OrderCreateRequest request,
-                        @AuthenticationPrincipal Long userId) {
-                log.info("Received order creation request: userId={}, clientOrderId={}",
-                                userId, request.getClientOrderId());
+  /** 신규 주문 생성 */
+  @PostMapping("/create")
+  public ResponseEntity<CommonResponse<OrderService.OrderCreateResponse>> createOrder(
+      @Valid @RequestBody OrderCreateRequest request
+      //@AuthenticationPrincipal Long userId
+      ) {
 
-                OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
+    // ✅ 테스트용 userId 하드코딩 (나중에 JWT에서 추출)
+    Long userId = 1L;
 
-                return ResponseEntity
-                                .status(HttpStatus.ACCEPTED) // 202
-                                .body(response);
-        }
+    log.info("Received order creation request: userId={}, clientOrderId={}",
+        userId, request.getClientOrderId());
 
-        /** 주문 취소 */
-        @PostMapping("/cancel")
-        public ResponseEntity<OrderService.OrderCancelResponse> cancelOrder(
-                        @Valid @RequestBody OrderCancelRequest request,
-                        @AuthenticationPrincipal Long userId) {
-                log.info("Received order cancel request: userId={}, clientOrderId={}",
-                                userId, request.getClientOrderId());
+    OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
 
-                OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
+    return ResponseEntity
+        .status(HttpStatus.ACCEPTED) // 202
+        .body(CommonResponse.success(response));
+  }
 
-                return ResponseEntity
-                                .status(HttpStatus.ACCEPTED) // 202
-                                .body(response);
-        }
+  /** 주문 취소 */
+  @PostMapping("/cancel")
+  public ResponseEntity<CommonResponse<OrderService.OrderCancelResponse>> cancelOrder(
+      @Valid @RequestBody OrderCancelRequest request) {
+
+    // ✅ 테스트용 userId 하드코딩
+    Long userId = 1L;
+
+    log.info("Received order cancel request: userId={}, clientOrderId={}",
+        userId, request.getClientOrderId());
+
+    OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
+
+    return ResponseEntity
+        .status(HttpStatus.ACCEPTED) // 202
+        .body(CommonResponse.success(response));
+  }
 }

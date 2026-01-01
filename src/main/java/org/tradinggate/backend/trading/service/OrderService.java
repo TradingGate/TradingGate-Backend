@@ -2,39 +2,53 @@ package org.tradinggate.backend.trading.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.aop.redisson.RedissonLock;
 import org.tradinggate.backend.global.exception.CustomException;
 import org.tradinggate.backend.global.exception.TradingErrorCode;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.api.validator.OrderValidator;
-import org.tradinggate.backend.trading.domain.entity.Order;
-import org.tradinggate.backend.trading.domain.entity.OrderStatus;
+import org.tradinggate.backend.trading.domain.entity.*;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+import static org.tradinggate.backend.global.exception.UserErrorCode.DUPLICATE_REQUEST;
+
 @Slf4j
 @Service
+@Transactional
 @Profile("api")
 @RequiredArgsConstructor
 public class OrderService {
 
-  // IdempotencyService 제거
   private final OrderEventProducer orderEventProducer;
   private final OrderValidator orderValidator;
   private final RiskCheckService riskCheckService;
   private final OrderRepository orderRepository;
+  private final SourceType sourceType;
 
   /** 신규 주문 생성 */
   @RedissonLock(
-      key = "'order:idempotency:' + #userId + ':' + #request.clientOrderId",
-      waitTime = 0L,      // 대기 없이 즉시 실패
-      leaseTime = 30L     // 30초 후 자동 해제
+      key =  "'order:' + #request.clientOrderId", // 임시"'order:idempotency:' + #userId + ':' + #request.clientOrderId",
+      waitTime = 0L,
+      leaseTime = 30L
   )
   public OrderCreateResponse createOrder(OrderCreateRequest request, Long userId) {
     log.info("Creating order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
+
+    orderRepository.findByUserIdAndClientOrderId(userId, request.getClientOrderId())
+        .ifPresent(existingOrder -> {
+          log.warn(" Duplicate order detected: userId={}, clientOrderId={}",
+              userId, request.getClientOrderId());
+          throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);
+        });
 
     // 1. 유저 권한 및 리스크 상태 검증
     riskCheckService.isBlocked(userId, request.getSymbol());
@@ -53,14 +67,25 @@ public class OrderService {
         request.getPrice(),
         request.getQuantity());
 
+    orderRepository.save(order);
+
     orderEventProducer.publishNewOrder(order);
 
     // 4. 응답 반환
     return OrderCreateResponse.builder()
-        .clientOrderId(request.getClientOrderId())
-        .received(true)
-        .message("Order received")
+        .commandType("NEW")
+        .userId(userId)
+        .clientOrderId(order.getClientOrderId())
+        .symbol(order.getSymbol())
+        .orderSide(order.getOrderSide())
+        .orderType(order.getOrderType())
+        .timeInForce(order.getTimeInForce())
+        .price(order.getPrice())
+        .quantity(order.getQuantity())
+        .source(sourceType.name())
+        .receivedAt(LocalDateTime.now())
         .build();
+
   }
 
   /** 주문 취소 */
@@ -84,24 +109,35 @@ public class OrderService {
 
     return OrderCancelResponse.builder()
         .clientOrderId(request.getClientOrderId())
-        .received(true)
-        .message("Cancel request received")
         .build();
   }
 
   @lombok.Data
   @lombok.Builder
   public static class OrderCreateResponse {
+    private String commandType;
+    private Long userId;
     private String clientOrderId;
-    private Boolean received;
-    private String message;
+    private String symbol;
+    private OrderSide orderSide;
+    private OrderType orderType;
+    private TimeInForce timeInForce;
+    private BigDecimal price;
+    private BigDecimal quantity;
+    private String cancelTarget;
+    private String source;
+    private LocalDateTime receivedAt;
   }
 
   @lombok.Data
   @lombok.Builder
   public static class OrderCancelResponse {
-    private String clientOrderId;
     private Boolean received;
-    private String message;
+    private String commandType;
+    private Long userId;
+    private String clientOrderId;
+    private String cancelTarget;
+    private String source;
+    private LocalDateTime receivedAt;
   }
 }

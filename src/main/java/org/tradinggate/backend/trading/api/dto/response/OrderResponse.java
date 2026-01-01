@@ -29,21 +29,12 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class OrderResponse {
 
-  /**
-   * ✅ DB의 PK (Auto Increment)
-   */
   @JsonProperty("id")
   private Long id;
 
-  /**
-   * ✅ Matching Worker가 발행한 주문 ID (null일 수 있음)
-   */
   @JsonProperty("order_id")
   private Long orderId;
 
-  /**
-   * ✅ 클라이언트가 제공한 주문 ID (주 식별자)
-   */
   @JsonProperty("client_order_id")
   private String clientOrderId;
 
