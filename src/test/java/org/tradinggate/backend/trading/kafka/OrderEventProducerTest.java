@@ -17,7 +17,7 @@ import org.tradinggate.backend.trading.domain.entity.OrderSide;
 import org.tradinggate.backend.trading.domain.entity.OrderType;
 import org.tradinggate.backend.trading.domain.entity.TimeInForce;
 import org.tradinggate.backend.trading.kafka.event.OrderCancelEvent;
-import org.tradinggate.backend.trading.kafka.event.OrderEvent;
+import org.tradinggate.backend.trading.kafka.event.OrderCreateEvent;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 
 import java.math.BigDecimal;
@@ -85,7 +85,7 @@ class OrderEventProducerTest {
     // then
     ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-    ArgumentCaptor<OrderEvent> eventCaptor = ArgumentCaptor.forClass(OrderEvent.class);
+    ArgumentCaptor<OrderCreateEvent> eventCaptor = ArgumentCaptor.forClass(OrderCreateEvent.class);
 
     verify(objectMapper).writeValueAsString(eventCaptor.capture());
     verify(kafkaTemplate).send(topicCaptor.capture(), keyCaptor.capture(), anyString());
@@ -93,7 +93,7 @@ class OrderEventProducerTest {
     assertEquals("orders.in", topicCaptor.getValue());
     assertEquals("BTCUSDT", keyCaptor.getValue()); // key = symbol
 
-    OrderEvent event = eventCaptor.getValue();
+    OrderCreateEvent event = eventCaptor.getValue();
     assertEquals("NEW", event.getCommandType());
     assertEquals(userId, event.getUserId());
     assertEquals("cli-20241204-0001", event.getClientOrderId());

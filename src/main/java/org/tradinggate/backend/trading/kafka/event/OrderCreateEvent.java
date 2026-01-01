@@ -6,10 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.tradinggate.backend.trading.domain.entity.Order;
-import org.tradinggate.backend.trading.domain.entity.OrderSide;
-import org.tradinggate.backend.trading.domain.entity.OrderType;
-import org.tradinggate.backend.trading.domain.entity.TimeInForce;
+import org.tradinggate.backend.trading.domain.entity.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,10 +28,10 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderEvent {
+public class OrderCreateEvent {
 
   @JsonProperty("commandType")
-  private String commandType;  // "NEW"
+  private EventType commandType;
 
   @JsonProperty("userId")
   private Long userId;
@@ -61,7 +58,7 @@ public class OrderEvent {
   private BigDecimal quantity;
 
   @JsonProperty("source")
-  private String source;  // "API"
+  private SourceType source;
 
   @JsonProperty("receivedAt")
   private LocalDateTime receivedAt;
@@ -69,9 +66,9 @@ public class OrderEvent {
   /**
    * Order Entity -> OrderEvent 변환 (PDF 스키마)
    */
-  public static OrderEvent from(Order order) {
-    return OrderEvent.builder()
-        .commandType("NEW")
+  public static OrderCreateEvent from(Order order, SourceType sourceType) {
+    return OrderCreateEvent.builder()
+        .commandType(EventType.NEW)
         .userId(order.getUserId())
         .clientOrderId(order.getClientOrderId())
         .symbol(order.getSymbol())
@@ -80,7 +77,7 @@ public class OrderEvent {
         .timeInForce(order.getTimeInForce())
         .price(order.getPrice())
         .quantity(order.getQuantity())
-        .source("API")
+        .source(sourceType)
         .receivedAt(LocalDateTime.now())
         .build();
   }

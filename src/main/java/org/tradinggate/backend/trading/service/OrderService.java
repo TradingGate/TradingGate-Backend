@@ -73,17 +73,9 @@ public class OrderService {
 
     // 4. 응답 반환
     return OrderCreateResponse.builder()
-        .commandType("NEW")
-        .userId(userId)
         .clientOrderId(order.getClientOrderId())
-        .symbol(order.getSymbol())
-        .orderSide(order.getOrderSide())
-        .orderType(order.getOrderType())
-        .timeInForce(order.getTimeInForce())
-        .price(order.getPrice())
-        .quantity(order.getQuantity())
-        .source(sourceType.name())
-        .receivedAt(LocalDateTime.now())
+        .status("ACCEPTED")
+        .message("Order received")
         .build();
 
   }
@@ -115,29 +107,16 @@ public class OrderService {
   @lombok.Data
   @lombok.Builder
   public static class OrderCreateResponse {
-    private String commandType;
-    private Long userId;
     private String clientOrderId;
-    private String symbol;
-    private OrderSide orderSide;
-    private OrderType orderType;
-    private TimeInForce timeInForce;
-    private BigDecimal price;
-    private BigDecimal quantity;
-    private String cancelTarget;
-    private String source;
-    private LocalDateTime receivedAt;
+    private String status;
+    private String message;
   }
 
   @lombok.Data
   @lombok.Builder
   public static class OrderCancelResponse {
-    private Boolean received;
-    private String commandType;
-    private Long userId;
     private String clientOrderId;
-    private String cancelTarget;
-    private String source;
-    private LocalDateTime receivedAt;
+    private String status;
+    private String message;
   }
 }

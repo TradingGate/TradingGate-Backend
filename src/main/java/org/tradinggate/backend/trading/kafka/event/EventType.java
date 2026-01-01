@@ -6,5 +6,20 @@ package org.tradinggate.backend.trading.kafka.event;
  * - 이벤트 타입 상수 정의
  */
 public enum EventType {
-  NEW, CANCEL, CREATED, STATUS_CHANGED, CANCELED, REJECTED, TRADE_MATCHED, EXPIRED
+  NEW,
+  CANCEL,
+
+  CREATED,
+  CANCELED,
+  REJECTED,
+  TRADE_MATCHED,
+  EXPIRED;
+
+  public boolean isCommand() {
+    return this == NEW || this == CANCEL;
+  }
+
+  public boolean isEvent() {
+    return !isCommand();
+  }
 }

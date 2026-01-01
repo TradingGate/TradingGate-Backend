@@ -2,7 +2,7 @@ package org.tradinggate.backend.trading.util;
 
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.trading.kafka.event.OrderCancelEvent;
-import org.tradinggate.backend.trading.kafka.event.OrderEvent;
+import org.tradinggate.backend.trading.kafka.event.OrderCreateEvent;
 
 /**
  * [A-1] Trading API - Symbol Key 추출
@@ -16,7 +16,7 @@ import org.tradinggate.backend.trading.kafka.event.OrderEvent;
 @Component
 public class SymbolKeyExtractor {
 
-  public String extractKey(OrderEvent event) {
+  public String extractKey(OrderCreateEvent event) {
     return event.getSymbol();
   }
 
