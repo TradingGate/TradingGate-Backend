@@ -28,8 +28,8 @@ public class ApiProfileConfig {
   public ApplicationRunner kafkaListenerCheck(@Autowired(required = false) KafkaListenerEndpointRegistry registry) {
     return args -> {
       if (registry != null && !registry.getListenerContainerIds().isEmpty()) {
-        log.warn("⚠️ [API Profile Violation] Kafka Listeners detected: {}", registry.getListenerContainerIds());
-        log.warn("⛔ Force stopping all Kafka Listeners (API Layer must use PRODUCER only).");
+        log.warn("⚠[API Profile Violation] Kafka Listeners detected: {}", registry.getListenerContainerIds());
+        log.warn(" Force stopping all Kafka Listeners (API Layer must use PRODUCER only).");
         registry.stop();
       } else {
         log.info("✅ [API Profile Valid] No active Kafka Consumers detected.");

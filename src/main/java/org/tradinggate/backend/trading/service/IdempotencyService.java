@@ -5,7 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.tradinggate.backend.trading.exception.DuplicateOrderException;
+import org.tradinggate.backend.global.exception.CustomException;
+import org.tradinggate.backend.global.exception.TradingErrorCode;
 
 import java.time.Duration;
 
@@ -35,8 +36,7 @@ public class IdempotencyService {
 
     if (Boolean.FALSE.equals(isNew)) {
       log.warn("Duplicate order detected: userId={}, clientOrderId={}", userId, clientOrderId);
-      throw new DuplicateOrderException(
-          String.format("Duplicate order: clientOrderId=%s already exists", clientOrderId));
+      throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);
     }
 
     log.info("Idempotency lock acquired: userId={}, clientOrderId={}", userId, clientOrderId);

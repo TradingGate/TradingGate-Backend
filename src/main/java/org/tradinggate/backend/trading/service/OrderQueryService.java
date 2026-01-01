@@ -8,14 +8,13 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.exception.CustomException;
+import org.tradinggate.backend.global.exception.TradingErrorCode;
 import org.tradinggate.backend.global.exception.UserErrorCode;
 import org.tradinggate.backend.trading.api.dto.request.OrderQueryRequest;
 import org.tradinggate.backend.trading.api.dto.response.OrderResponse;
 import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.OrderStatus;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
-import org.tradinggate.backend.trading.exception.OrderNotFoundException;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -53,7 +52,7 @@ public class OrderQueryService {
    */
   public OrderResponse getOrderById(Long userId, Long orderId) {
     Order order = orderRepository.findById(orderId)
-        .orElseThrow(() -> new OrderNotFoundException("주문을 찾을 수 없습니다: " + orderId));
+        .orElseThrow(() -> new CustomException(TradingErrorCode.ORDER_NOT_FOUND));
 
     validateUserAccess(order, userId);
     return OrderResponse.from(order);
@@ -64,7 +63,7 @@ public class OrderQueryService {
    */
   public OrderResponse getOrderByClientOrderId(Long userId, String clientOrderId) {
     Order order = orderRepository.findByUserIdAndClientOrderId(userId, clientOrderId)
-        .orElseThrow(() -> new OrderNotFoundException("ClientOrderId: " + clientOrderId));
+        .orElseThrow(() -> new CustomException(TradingErrorCode.ORDER_NOT_FOUND));
 
     // ClientOrderId 조회도 본인 확인 필요
     validateUserAccess(order, userId);

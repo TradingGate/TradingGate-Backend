@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.tradinggate.backend.trading.exception.DuplicateOrderException;
+import org.tradinggate.backend.global.exception.CustomException;
 
 import java.time.Duration;
 
@@ -65,8 +65,8 @@ class IdempotencyServiceTest {
         .thenReturn(false);
 
     // when & then
-    DuplicateOrderException exception = assertThrows(
-        DuplicateOrderException.class,
+    CustomException exception = assertThrows(
+        CustomException.class,
         () -> idempotencyService.checkAndLock(userId, clientOrderId));
 
     assertTrue(exception.getMessage().contains("already exists"));

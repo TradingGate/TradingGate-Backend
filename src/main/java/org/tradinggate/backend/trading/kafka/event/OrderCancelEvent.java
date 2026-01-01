@@ -92,7 +92,7 @@ public class OrderCancelEvent {
         .clientOrderId(order.getClientOrderId())
         .symbol(order.getSymbol())
         .cancelTarget(CancelTarget.builder()
-            .by("ORDER_ID") // ✅ orderId로 취소
+            .by("ORDER_ID")
             .value(order.getOrderId() != null ? order.getOrderId().toString() : null)
             .build())
         .source("API")

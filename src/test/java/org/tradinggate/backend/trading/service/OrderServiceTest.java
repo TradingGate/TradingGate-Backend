@@ -6,13 +6,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradinggate.backend.global.exception.CustomException;
+import org.tradinggate.backend.global.exception.TradingErrorCode;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.domain.entity.OrderSide;
 import org.tradinggate.backend.trading.domain.entity.OrderType;
 import org.tradinggate.backend.trading.domain.entity.TimeInForce;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
-import org.tradinggate.backend.trading.exception.DuplicateOrderException;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 import org.tradinggate.backend.trading.api.validator.OrderValidator;
 
@@ -101,11 +102,11 @@ class OrderServiceTest {
                                 .build();
 
                 when(riskCheckService.isBlocked(anyLong(), anyString())).thenReturn(false);
-                doThrow(new DuplicateOrderException("Duplicate order"))
+                doThrow(new CustomException(TradingErrorCode.DUPLICATE_ORDER))
                                 .when(idempotencyService).checkAndLock(anyLong(), anyString());
 
                 // when & then
-                assertThrows(DuplicateOrderException.class,
+                assertThrows(CustomException.class,
                                 () -> orderService.createOrder(request, userId));
 
                 verify(orderEventProducer, never())

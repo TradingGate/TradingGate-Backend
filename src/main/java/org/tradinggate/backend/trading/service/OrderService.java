@@ -4,14 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+import org.tradinggate.backend.global.exception.CustomException;
+import org.tradinggate.backend.global.exception.TradingErrorCode;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.api.validator.OrderValidator;
 import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.OrderStatus;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
-import org.tradinggate.backend.trading.exception.InvalidOrderException;
-import org.tradinggate.backend.trading.exception.OrderNotFoundException;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 
 @Slf4j
@@ -75,14 +75,14 @@ public class OrderService {
     // clientOrderId 또는 orderId로 조회가 필요하나, request에는 clientOrderId가 필수
     Order order = orderRepository.findByUserIdAndClientOrderId(userId, request.getClientOrderId())
         .orElseThrow(
-            () -> new OrderNotFoundException("Order not found or invalid ownership: " + request.getClientOrderId()));
+            () -> new CustomException(TradingErrorCode.ORDER_NOT_FOUND));
 
     // 2. 이미 종료된 주문인지 확인
     if (order.getStatus() == OrderStatus.FILLED ||
         order.getStatus() == OrderStatus.CANCELED ||
         order.getStatus() == OrderStatus.REJECTED ||
         order.getStatus() == OrderStatus.EXPIRED) {
-      throw new InvalidOrderException("Order cannot be canceled in state: " + order.getStatus());
+      throw new CustomException(TradingErrorCode.INVALID_ORDER);
     }
 
     // 3. Kafka orders.in 취소 이벤트 발행

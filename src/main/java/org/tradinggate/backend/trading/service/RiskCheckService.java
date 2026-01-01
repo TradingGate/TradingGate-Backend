@@ -4,7 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.tradinggate.backend.trading.exception.RiskBlockedException;
+import org.tradinggate.backend.global.exception.CustomException;
+import org.tradinggate.backend.global.exception.TradingErrorCode;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -132,19 +133,19 @@ public class RiskCheckService {
    */
   public void validateRisk(Long userId, BigDecimal orderAmount) {
     if (isBlocked(userId)) {
-      throw new RiskBlockedException("리스크 차단된 사용자입니다");
+      throw new CustomException(TradingErrorCode.RISK_BLOCKED);
     }
 
     if (!checkDailyVolume(userId, orderAmount)) {
-      throw new RiskBlockedException("일일 거래량 한도를 초과했습니다");
+      throw new CustomException(TradingErrorCode.RISK_BLOCKED);
     }
 
     if (!checkDailyOrderCount(userId)) {
-      throw new RiskBlockedException("일일 주문 횟수 한도를 초과했습니다");
+      throw new CustomException(TradingErrorCode.RISK_BLOCKED);
     }
 
     if (!checkOrderRateLimit(userId)) {
-      throw new RiskBlockedException("주문 빈도가 너무 높습니다");
+      throw new CustomException(TradingErrorCode.RISK_BLOCKED);
     }
   }
 }
