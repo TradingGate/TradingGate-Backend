@@ -25,5 +25,6 @@ spring:
 
 logging:
   level:
-    org.springframework: WARN
+    org.springframework.boot.autoconfigure: ERROR
+    org.springframework: ERROR
     org.redisson: OFF

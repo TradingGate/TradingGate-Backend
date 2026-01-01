@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+import org.tradinggate.backend.global.aop.redisson.RedissonLock;
 import org.tradinggate.backend.global.exception.CustomException;
 import org.tradinggate.backend.global.exception.TradingErrorCode;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
@@ -20,13 +21,18 @@ import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 @RequiredArgsConstructor
 public class OrderService {
 
-  private final IdempotencyService idempotencyService;
+  // IdempotencyService 제거
   private final OrderEventProducer orderEventProducer;
   private final OrderValidator orderValidator;
   private final RiskCheckService riskCheckService;
   private final OrderRepository orderRepository;
 
   /** 신규 주문 생성 */
+  @RedissonLock(
+      key = "'order:idempotency:' + #userId + ':' + #request.clientOrderId",
+      waitTime = 0L,      // 대기 없이 즉시 실패
+      leaseTime = 30L     // 30초 후 자동 해제
+  )
   public OrderCreateResponse createOrder(OrderCreateRequest request, Long userId) {
     log.info("Creating order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
 
@@ -36,46 +42,34 @@ public class OrderService {
     // 2. 주문 유효성 검증 (틱/스텝, 필수값)
     orderValidator.validate(request);
 
-    // 3. 멱등성 체크
-    idempotencyService.checkAndLock(userId, request.getClientOrderId());
+    // 3. Kafka orders.in 발행
+    Order order = Order.create(
+        userId,
+        request.getClientOrderId(),
+        request.getSymbol(),
+        request.getOrderSide(),
+        request.getOrderType(),
+        request.getTimeInForce(),
+        request.getPrice(),
+        request.getQuantity());
 
-    try {
-      // 4. Kafka orders.in 발행 (Order 객체 생성만 하고 저장하지 않음)
-      Order order = Order.create(
-          userId,
-          request.getClientOrderId(),
-          request.getSymbol(),
-          request.getOrderSide(),
-          request.getOrderType(),
-          request.getTimeInForce(),
-          request.getPrice(),
-          request.getQuantity());
+    orderEventProducer.publishNewOrder(order);
 
-      orderEventProducer.publishNewOrder(order);
-
-      // 5. 응답 반환
-      return OrderCreateResponse.builder()
-          .clientOrderId(request.getClientOrderId())
-          .received(true)
-          .message("Order received")
-          .build();
-
-    } catch (Exception e) {
-      log.error("Failed to process create order", e);
-      idempotencyService.markFailed(userId, request.getClientOrderId());
-      throw e;
-    }
+    // 4. 응답 반환
+    return OrderCreateResponse.builder()
+        .clientOrderId(request.getClientOrderId())
+        .received(true)
+        .message("Order received")
+        .build();
   }
 
   /** 주문 취소 */
   public OrderCancelResponse cancelOrder(OrderCancelRequest request, Long userId) {
     log.info("Cancelling order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
 
-    // 1. 주문 소유권 검증 (DB 조회)
-    // clientOrderId 또는 orderId로 조회가 필요하나, request에는 clientOrderId가 필수
+    // 1. 주문 소유권 검증
     Order order = orderRepository.findByUserIdAndClientOrderId(userId, request.getClientOrderId())
-        .orElseThrow(
-            () -> new CustomException(TradingErrorCode.ORDER_NOT_FOUND));
+        .orElseThrow(() -> new CustomException(TradingErrorCode.ORDER_NOT_FOUND));
 
     // 2. 이미 종료된 주문인지 확인
     if (order.getStatus() == OrderStatus.FILLED ||
