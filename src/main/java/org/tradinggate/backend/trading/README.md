@@ -119,7 +119,3 @@ src/main/java/org/tradinggate/backend/trading/
 - [ ] **Circuit Breaker**: 급격한 변동성 발생 시 시스템 전체 주문 차단 기능 도입
 - [ ] **Performance Tuning**: Redis Pipeline 도입을 통한 리스크 체크 지연 시간 최소화
 
----
-
-## 📧 Contact
-트레이딩 시스템 관련 문의는 Backend 팀 채널을 이용해 주세요.
