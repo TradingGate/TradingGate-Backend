@@ -64,6 +64,16 @@ logging:
     org.hibernate.type.descriptor.sql: TRACE
 
 
+# ==========================
+# outbox
+# ==========================
+outbox:
+  batch-size: 200
+  max-retries: 10
+  poll-interval-ms: 200
+  monitor-interval-ms: 5000
+
+
 # ============================================
 #  Profile: local
 # ============================================
