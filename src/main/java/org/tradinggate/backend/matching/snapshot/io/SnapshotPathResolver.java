@@ -2,6 +2,13 @@ package org.tradinggate.backend.matching.snapshot.io;
 
 import java.nio.file.Path;
 
+/**
+ * - 스냅샷 파일/디렉토리 경로 규칙을 단일 책임으로 관리
+ *
+ * [규칙]
+ * - snapshots/{topic}/{partition}/snapshot_{offset}_{createdAtMillis}_{snapshotId}.json.gz
+ * - checksum은 "<snapshotFile>.sha256"로 저장
+ */
 public class SnapshotPathResolver {
 
     private final Path baseDir;

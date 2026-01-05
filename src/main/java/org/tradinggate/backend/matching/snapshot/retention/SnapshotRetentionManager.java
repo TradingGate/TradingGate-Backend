@@ -14,6 +14,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+
+/**
+ * - 파티션별 스냅샷 파일을 최신 N개(keepLatest)만 유지하고 나머지는 삭제.
+ *
+ * [운영 의도]
+ * - 디스크 사용량이 무한히 증가하는 것을 방지.
+ * - 복구 관점에서는 "최신 스냅샷 + Kafka replay"가 기본이므로, 오래된 스냅샷은 운영상 가치가 낮다.
+ *
+ * [주의]
+ * - retention은 best-effort이며, 삭제 실패가 시스템 정합성에 영향을 주지 않아야 한다.
+ */
 @Log4j2
 @RequiredArgsConstructor
 public class SnapshotRetentionManager {
@@ -22,6 +33,15 @@ public class SnapshotRetentionManager {
     private final SnapshotPathResolver resolver;
     private final int keepLatest;
 
+    /**
+     * @param topic 스냅샷 대상 토픽
+     * @param partition 스냅샷 대상 파티션
+     * @sideEffects 오래된 snapshot(.json.gz) 및 checksum(.sha256) 파일을 삭제할 수 있다.
+     *
+     * [정책]
+     * - 정렬 기준은 (offset desc → createdAt desc → snapshotId)로 통일한다.
+     *   동일 offset에서 여러 파일이 생겼을 때도 결정적으로 "최신 후보"를 고르게 하기 위함.
+     */
     public void applyRetention(String topic, int partition) throws IOException {
         Path dir = resolver.partitionDir(topic, partition);
         if (!Files.exists(dir)) return;
@@ -36,6 +56,7 @@ public class SnapshotRetentionManager {
 
         if (metas.size() <= keepLatest) return;
 
+        // keepLatest 이후는 전부 삭제 대상. (메타는 최신순 정렬됨)
         for (int i = keepLatest; i < metas.size(); i++) {
             deleteSnapshotAndChecksum(topic, partition, metas.get(i).path());
         }
@@ -58,6 +79,7 @@ public class SnapshotRetentionManager {
         try {
             Files.deleteIfExists(snapshotFile);
 
+            // 스냅샷과 체크섬은 한 세트로 관리(고아 파일 방지).
             Path checksum = resolver.checksumFilePath(topic, partition, snapshotFile.getFileName().toString());
             Files.deleteIfExists(checksum);
 

@@ -17,6 +17,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
+/**
+ * - 로컬 디스크의 스냅샷 파일들 중 최신 후보를 찾아 검증(체크섬) 후 역직렬화.
+ * - 손상/부분 쓰기 파일이 섞일 수 있으므로 fallbackCount 만큼 "최신부터" 여러 개를 시도.
+ */
 @Log4j2
 @RequiredArgsConstructor
 public class SnapshotLoader {
@@ -25,6 +29,10 @@ public class SnapshotLoader {
     private final ObjectMapper objectMapper;
     private final int fallbackCount;
 
+    /**
+     * @return 로드 성공 시 LoadedSnapshot, 실패 시 empty
+     * @sideEffects 없음 (파일 읽기만)
+     */
     public Optional<LoadedSnapshot> loadLatest(String topic, int partition) {
         Path dir = resolver.partitionDir(topic, partition);
         if (!Files.exists(dir) || !Files.isDirectory(dir)) {
@@ -40,6 +48,8 @@ public class SnapshotLoader {
             return Optional.empty();
         }
 
+        // 최신 후보부터 fallbackCount만큼 순회하며 검증+역직렬화 성공한 첫 파일을 선택.
+        // (retention/부분 손상/체크섬 불일치 등 실패를 흡수)
         int limit = Math.min(fallbackCount, candidates.size());
         for (int i = 0; i < limit; i++) {
             SnapshotFileMeta meta = candidates.get(i);
@@ -66,6 +76,7 @@ public class SnapshotLoader {
             }
         }
 
+        // 최신 offset 우선 + 동일 offset이면 createdAt 최신 우선
         metas.sort(Comparator
                 .comparingLong(SnapshotFileMeta::offset).reversed()
                 .thenComparingLong(SnapshotFileMeta::createdAtMillis).reversed()
@@ -85,6 +96,7 @@ public class SnapshotLoader {
             return null;
         }
 
+        // 파일 무결성은 "gzipped bytes" 기준 sha256으로 검증한다.
         byte[] gzipped = Files.readAllBytes(snapshotFile);
         String actualSha = SnapshotCryptoUtils.sha256Hex(gzipped);
 

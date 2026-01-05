@@ -9,15 +9,20 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * - 스냅샷 쓰기는 단일 writer 스레드 + bounded queue로 격리한다.
+ */
 @Log4j2
 public class SnapshotWriteQueue implements AutoCloseable {
 
     private final ThreadPoolExecutor executor;
     private final SnapshotWriteWorker worker;
 
-    private final Object lifecycleLock = new Object();
+    // accepting은 "일반 enqueue"를 막기 위한 플래그.
     private volatile boolean accepting = true;
+    private final Object lifecycleLock = new Object();
 
+    // drainLock + inFlight는 "큐가 비었지만 아직 실행 중"인 경쟁조건을 피하기 위한 동기화 장치.
     private final Object drainLock = new Object();
     private final AtomicInteger inFlight = new AtomicInteger(0);
 
@@ -40,6 +45,7 @@ public class SnapshotWriteQueue implements AutoCloseable {
                     return t;
                 },
                 (r, ex) -> {
+                    // 큐가 가득 찬 경우 drop. 상위에서 best-effort로 처리.
                     throw new RejectedExecutionException("snapshot queue full or executor shutting down");
                 }
         );
@@ -60,9 +66,8 @@ public class SnapshotWriteQueue implements AutoCloseable {
             if (!force && !accepting) return false;
             if (executor.isShutdown() || executor.isTerminated()) return false;
 
-            // IMPORTANT: increment before submit to avoid a race where the task is dequeued
-            // (queue empty) but hasn't yet incremented inFlight, causing awaitDrained() to
-            // return true too early.
+            // - inFlight를 submit 전에 증가시켜 drain 레이스를 방지.
+            // - 큐가 잠깐 비는 순간 awaitDrained()가 "완료"로 오판하지 않게 한다.
             inFlight.incrementAndGet();
             try {
                 executor.execute(() -> {
@@ -79,7 +84,6 @@ public class SnapshotWriteQueue implements AutoCloseable {
                 });
                 return true;
             } catch (RejectedExecutionException e) {
-                // bounded queue full OR shutting down
                 inFlight.decrementAndGet();
                 synchronized (drainLock) {
                     drainLock.notifyAll();
@@ -102,6 +106,10 @@ public class SnapshotWriteQueue implements AutoCloseable {
         }
     }
 
+    /**
+     * @return timeout 내에 큐/실행 작업이 모두 비면 true, 아니면 false
+     * @sideEffects 없음 (대기만)
+     */
     public boolean awaitDrained(long timeoutMillis) {
         long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMillis);
         synchronized (drainLock) {
@@ -127,6 +135,7 @@ public class SnapshotWriteQueue implements AutoCloseable {
 
     @Override
     public void close() {
+        // 신규 일반 enqueue 차단 → executor 종료 → drain(best-effort) → 최종 종료
         stopAccepting();
 
         executor.shutdown();

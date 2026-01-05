@@ -13,6 +13,13 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.zip.GZIPOutputStream;
 
+/**
+ * - PartitionSnapshot을 JSON으로 직렬화하고, 압축/체크섬을 계산해 저장 payload를 만든다.
+ *
+ * [정책]
+ * - checksum은 "압축된 바이트" 기준으로 계산.
+ *   (전송/저장 단위가 gzipped payload이므로 파일 무결성 검증이 단순해짐)
+ */
 public class JacksonSnapshotPayloadCodec implements SnapshotPayloadCodec {
     private final ObjectMapper objectMapper;
 
@@ -20,6 +27,9 @@ public class JacksonSnapshotPayloadCodec implements SnapshotPayloadCodec {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * @return gzipped JSON bytes + sha256Hex(압축 바이트 기준)
+     */
     @Override
     public SnapshotPayload encode(
             PartitionSnapshot snapshot,

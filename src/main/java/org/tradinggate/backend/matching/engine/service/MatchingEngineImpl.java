@@ -16,6 +16,17 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * - 단일 심볼(OrderBook) 단위로 주문(Command)을 적용하고,
+ *   매칭 결과(체결/상태변경)를 MatchResult로 반환한다.
+ *
+ * [정합성/재처리]
+ * - Kafka 재시도로 인해 동일 커맨드가 다시 들어올 수 있으므로,
+ *   NEW에 대해서는 clientOrderId 기반 멱등성 체크를 수행한다.
+ *
+ * [주의]
+ * - 메모리 오더북 기반이므로, 프로세스 종료/리밸런싱 시 snapshot/restore가 정합성 유지의 핵심이다.
+ */
 @Component
 @Getter
 @RequiredArgsConstructor(access = AccessLevel.PUBLIC)
@@ -55,12 +66,13 @@ public class MatchingEngineImpl implements MatchingEngine {
         String clientOrderId = command.getClientOrderId();
         String symbol = command.getSymbol();
 
-        // 2) 멱등성 체크
+        // Kafka 재시도(동일 레코드 재처리) 시 중복 NEW를 방지하기 위한 멱등성 규칙.
         if (isDuplicateNew(orderBook, accountId, clientOrderId)) {
             return MatchResult.empty();
         }
 
-        // 1) 사전 리스크/심볼 상태 체크
+        // 사전 검증에서 막히면 REJECTED로 이벤트를 남기되, book에 잔존하지 않도록 한다.
+        // TODO(MUST) : B 파트에서 받아와서 여기서 수정.
         PreCheckRejectReason preCheckReason = preCheckNewOrder(command);
         if (preCheckReason != null) {
             return handlePreCheckReject(orderBook, command, accountId, clientOrderId, symbol, preCheckReason, currentTimeMillis);
@@ -68,13 +80,12 @@ public class MatchingEngineImpl implements MatchingEngine {
 
         MatchResult result = MatchResult.empty();
 
-        // 3) Order 생성 + 인덱스 + CREATED 이벤트
         Order taker = createAndIndexNewOrder(orderBook, command, accountId, clientOrderId, symbol, currentTimeMillis, result);
 
-        // 4) 가격–시간 우선 매칭 루프
+        // 가격–시간 우선 매칭. (동일 가격 레벨은 FIFO)
         runMatchingLoop(orderBook, taker, symbol, currentTimeMillis, result);
 
-        // 5) timeInForce 별 잔량 처리
+        // 체결 후 잔량 처리(TIF).
         applyTimeInForceAfterMatch(orderBook, taker, currentTimeMillis, result);
 
         return result;
@@ -99,6 +110,7 @@ public class MatchingEngineImpl implements MatchingEngine {
     ) {
         MatchResult result = MatchResult.empty();
 
+        // REJECT도 추적 가능해야 하므로 orderId를 부여하고 index에 등록
         long orderId = orderBook.nextOrderId();
         long price = command.getPrice() != null ? command.getPrice().longValue() : 0L;
         long quantity = command.getQuantity() != null ? command.getQuantity().longValue() : 0L;
@@ -196,10 +208,13 @@ public class MatchingEngineImpl implements MatchingEngine {
 
             Order maker = bestOpt.get();
 
+            // 가격이 교차하지 않으면 더 이상 매칭 불가 → 즉시 종료.
             if (!isPriceCrossed(taker, maker)) break;
 
             long takerRemaining = taker.getRemainingQuantity();
             long makerRemaining = maker.getRemainingQuantity();
+
+            // 비정상 잔량(0 이하)이 섞인 경우 book 정리 후 탈출.
             if (takerRemaining <= 0 || makerRemaining <= 0) {
                 if (makerRemaining <= 0) {
                     orderBook.removeFromBook(maker);
@@ -208,6 +223,7 @@ public class MatchingEngineImpl implements MatchingEngine {
             }
 
             long execQuantity = Math.min(takerRemaining, makerRemaining);
+            //  execPrice는 maker 가격(리미트 오더 가격) 기준으로 체결.
             long execPrice = maker.getPrice();
 
             OrderStatus takerPreviousStatus = taker.getStatus();
@@ -219,6 +235,7 @@ public class MatchingEngineImpl implements MatchingEngine {
             taker.applyFill(execQuantity, execPrice, currentTimeMillis);
             maker.applyFill(execQuantity, execPrice, currentTimeMillis);
 
+            // fill 후에는 레벨(totalQuantity)와 인덱스를 일관되게 갱신
             orderBook.onOrderFilled(taker, takerPrevRemaining);
             orderBook.onOrderFilled(maker, makerPrevRemaining);
 
@@ -227,6 +244,7 @@ public class MatchingEngineImpl implements MatchingEngine {
             MatchFill fill = MatchFill.of(matchId, symbol, execPrice, execQuantity, currentTimeMillis, taker, maker);
             result.addMatchFill(fill);
 
+            // 상태 변화(TRADE)는 이벤트로 남겨 외부(ledger/clearing)가 재구성
             OrderUpdate takerUpdate = OrderUpdate.of(
                     getOrderEventId(),
                     taker,
@@ -263,11 +281,11 @@ public class MatchingEngineImpl implements MatchingEngine {
 
         TimeInForce tif = taker.getTimeInForce();
         if (tif == TimeInForce.GTC) {
-            // 잔량을 오더북에 게시
+            // TimeInForce.GTC는 잔량을 오더북에 게시
             orderBook.addToBook(taker);
         } else {
-            // 향후 IOC/FOK 도입 시 세부 정책 분기
-            // v1: GTC 이외의 잔량은 모두 취소 처리
+            // TODO: IOC/FOK 등 상세 정책은 after version에서 도입.
+            // GTC 이외의 잔량은 모두 취소 처리하여 book 누수를 방지
             OrderStatus previousStatus = taker.getStatus();
             taker.cancel("TIME_IN_FORCE_EXPIRED", currentTimeMillis);
 
@@ -290,23 +308,25 @@ public class MatchingEngineImpl implements MatchingEngine {
 
     /**
      * 가격 스케일링 헬퍼
+     * - TODO: 심볼별 tickSize/scale
      */
     private long toPriceLong(BigDecimal price) {
         if (price == null) {
             return 0L;
         }
-        // TODO: 심볼별 소수 자릿수에 맞춰 scale
+        //
         return price.longValue();
     }
 
     /**
      * 수량 스케일링 헬퍼
+     * - TODO: lotSize/scale 적용 필요.
      */
     private long toQuantityLong(BigDecimal quantity) {
         if (quantity == null) {
             return 0L;
         }
-        // TODO: 심볼별 소수 자릿수에 맞춰 scale
+        //
         return quantity.longValue();
     }
 
@@ -334,14 +354,11 @@ public class MatchingEngineImpl implements MatchingEngine {
 
         CancelTarget cancelTarget = command.getCancelTarget();
         if (cancelTarget == null || cancelTarget.getCancelBy() == null) {
-            // 잘못된 취소 요청 → v1에서는 무시
             return result;
         }
 
-        // 1) CancelTarget 해석 (by ORDER_ID or CLIENT_ORDER_ID)
         Optional<Order> targetOrderOpt = resolveCancelTarget(orderBook, command, cancelTarget);
         if (targetOrderOpt.isEmpty()) {
-            // 대상 주문을 찾지 못한 경우 → v1에서는 조용히 무시
             return result;
         }
 
@@ -351,7 +368,6 @@ public class MatchingEngineImpl implements MatchingEngine {
             return result;
         }
 
-        // 3) 활성 주문인 경우 실제 취소 처리
         cancelActiveOrder(orderBook, targetOrder, currentTimeMillis, result);
 
         return result;
@@ -424,8 +440,4 @@ public class MatchingEngineImpl implements MatchingEngine {
     private String getOrderEventId() {
         return "orderEvent-" + UUID.randomUUID();
     }
-
-    // TODO: 향후 snapshot/복구를 위한 메서드 추가
-    //  - exportSnapshot(symbol) : 오더북 상태, 인덱스 등 직렬화
-    //  - restoreFromSnapshot(symbol, snapshot) : 재시작 시 복원
 }
