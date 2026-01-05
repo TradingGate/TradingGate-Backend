@@ -47,6 +47,13 @@ dependencies {
     testImplementation "org.testcontainers:kafka"
     testImplementation "org.awaitility:awaitility:4.2.0"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Mockito
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+
+    // 테스트 DB
+    testImplementation 'com.h2database:h2'
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310"
 }
 

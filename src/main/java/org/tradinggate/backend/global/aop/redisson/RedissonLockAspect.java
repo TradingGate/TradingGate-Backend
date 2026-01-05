@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.tradinggate.backend.global.exception.UserErrorCode.DUPLICATE_REQUEST;
 
-
 @Log4j2
 @Aspect
 @Component
@@ -64,7 +63,8 @@ public class RedissonLockAspect {
             }
         }
 
-        Expression expression = parser.parseExpression(keyExpression);;
+        Expression expression = parser.parseExpression(keyExpression);
+        ;
         return expression.getValue(context, String.class);
     }
 

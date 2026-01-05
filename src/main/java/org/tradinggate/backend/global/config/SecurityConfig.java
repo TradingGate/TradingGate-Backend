@@ -35,16 +35,16 @@ public class SecurityConfig {
                 .formLogin(
                         config -> config
                                 .loginPage("/api/user/login")
-//                                .successHandler(loginSuccessHandler)
-//                                .failureHandler(loginFailureHandler)
+                // .successHandler(loginSuccessHandler)
+                // .failureHandler(loginFailureHandler)
                 )
                 .logout(AbstractHttpConfigurer::disable)
-//                .addFilterBefore(jwtCheckFilter, UsernamePasswordAuthenticationFilter.class)
-//                .addFilterBefore(refreshTokenFilter, JWTCheckFilter.class)
+                // .addFilterBefore(jwtCheckFilter, UsernamePasswordAuthenticationFilter.class)
+                // .addFilterBefore(refreshTokenFilter, JWTCheckFilter.class)
                 .exceptionHandling(
                         config -> config.disable()
-//                                .accessDeniedHandler(customAccessDeniedHandler)
-//                                .authenticationEntryPoint(customAuthenticationEntryPoint)
+                // .accessDeniedHandler(customAccessDeniedHandler)
+                // .authenticationEntryPoint(customAuthenticationEntryPoint)
                 );
 
         return http.build();
@@ -57,8 +57,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:8080",
                 "http://localhost:5173",
-                "http://web.jobveloper.co.kr/"
-        )); //추후 프론트엔드에 매칭
+                "http://web.jobveloper.co.kr/")); // 추후 프론트엔드에 매칭
         configuration.setAllowedMethods(Arrays.asList("HEAD", "GET", "POST", "PUT", "DELETE"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "userId"));
         configuration.setAllowCredentials(true);
@@ -69,6 +68,7 @@ public class SecurityConfig {
 
         return source;
     }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
