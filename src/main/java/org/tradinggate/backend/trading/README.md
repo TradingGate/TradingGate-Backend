@@ -1,37 +1,125 @@
-# Trading Module
+# TradingGate Trading System Module
 
-이 모듈은 TradingGate 백엔드의 핵심 트레이딩 기능을 담당합니다. 주문 처리, 조회, 리스크 관리 기능을 포함하고 있습니다.
+## 📖 개요
+**TradingGate Trading System**은 고성능 주문 처리와 리스크 관리를 담당하는 핵심 백엔드 모듈입니다.  
+사용자의 주문 요청을 안정적으로 처리하고, 실시간 리스크 검증을 수행하며, 체결 내역을 효율적으로 제공하는 것을 목적으로 합니다.
 
-## 클래스 별 목적 (Class Purposes)
-
-### Controller (`api/controller`)
-*   **`OrderController`**: 주문 생성, 수정, 취소와 같은 주문의 생명주기를 관리하는 HTTP 요청을 처리합니다. 클라이언트로부터 주문 요청을 받아 서비스 레이어로 전달합니다.
-*   **`OrderQueryController`**: 주문 내역 조회, 상세 조회 등 주문 데이터 조회 요청을 처리합니다. 읽기 전용 작업에 최적화되어 있습니다.
-*   **`TradeQueryController`**: 체결된 거래 내역(Trade) 조회 요청을 처리합니다. 사용자의 매매 기록을 제공하는 역할을 합니다.
-
-### Service (`service`)
-*   **`OrderService`**: 주문 처리의 핵심 비즈니스 로직을 수행합니다. 주문 유효성 검증(Validator 호출), 주문 상태 관리, 매칭 엔진 또는 외부 거래소로의 주문 전송 등을 담당합니다.
-*   **`OrderQueryService`**: 주문 데이터 조회에 대한 비즈니스 로직을 담당합니다. 데이터베이스나 캐시에서 효율적으로 주문 정보를 가져옵니다.
-*   **`RiskCheckService`**: 주문이 실행되기 전 리스크 관리 규칙(예: 증거금 부족, 주문 한도 초과 등)을 검증하는 서비스입니다. 안전한 거래를 보장하는 중요한 역할을 합니다.
-*   **`TradeQueryService`**: 체결 내역 조회 비즈니스 로직을 담당합니다.
+- **High Availability**: 비동기 주문 처리(Async)를 통해 대량의 트래픽에도 안정적인 응답 속도 보장
+- **Risk Management**: Redis 기반의 실시간 리스크 모니터링 및 자동차단 시스템 적용
+- **Layered Architecture**: Controller, Service, Domain 계층의 명확한 분리로 유지보수성 향상
 
 ---
 
-## Trading API 설명
+## 🔬 핵심 구성 요소 및 역할
 
-Notion에 기술된 Trading API 명세에 기반한 주요 기능 설명입니다.
+| 컴포넌트 (Component) | 패키지 (Package) | 주요 역할 및 책임 |
+|-------------------|------------------|-------------------|
+| **API Controller** | `api/controller` | HTTP 요청 진입점, 요청 검증(`@Valid`), 비동기 응답(`202 Accepted`) 반환 |
+| **Order Service** | `service` | 주문 생명주기 관리, 매칭 엔진 연동, 주문 상태 변경 로직 수행 |
+| **Risk Engine** | `service/RiskCheckService` | **Pre-trade Risk Check**: 주문 실행 전 한도 및 규정 위반 여부 검증 |
+| **Query Service** | `service/*QueryService` | 읽기 전용 트랜잭션 최적화, 대용량 주문/체결 내역 조회 처리 |
 
-### 1. 주문 관리 (Order Management)
-사용자가 주식, 코인 등의 자산을 매수하거나 매도할 수 있는 기능을 제공합니다.
-*   **주문 생성 (Place Order)**: 지정가, 시장가 등 다양한 유형의 주문을 요청합니다.
-*   **주문 취소 (Cancel Order)**: 미체결된 주문을 취소합니다.
+---
 
-### 2. 주문 조회 (Order Query)
-*   **미체결 주문 조회 (Open Orders)**: 현재 대기 중인 주문 목록을 조회합니다.
-*   **주문 내역 조회 (Order History)**: 과거의 모든 주문 이력을 조회합니다.
+## 🧠 시스템 아키텍처
 
-### 3. 체결 조회 (Trade Query)
-*   **체결 내역 (Trade History)**: 실제로 거래가 성사된 체결 내역을 조회하여 사용자의 손익 분석 등에 활용됩니다.
+### 1. Order Processing Flow
+사용자의 주문 요청이 처리되는 데이터 흐름입니다.
 
-### 4. 리스크 관리 (Risk Management)
-모든 주문 요청은 내부 리스크 관리 시스템을 통과해야 하며, 자산 한도나 규정 준수 여부를 자동으로 확인합니다.
+```mermaid
+graph LR
+    User[User Client] -->|POST /orders/create| Controller[OrderController]
+    Controller -->|DTO Validation| Service[OrderService]
+    Service -->|Validate| Risk[RiskCheckService]
+    Risk -->|Redis Check| Redis[(Redis)]
+    Service -->|Save| DB[(Database)]
+    Service -->|Publish| Kafka[Message Queue]
+```
+
+### 2. Risk Management Rules
+`RiskCheckService`는 Redis를 활용하여 다음 규칙을 실시간으로 강제합니다.
+
+- **🚫 User Blocking**: 규정 위반 사용자 즉시 거래 차단
+- **💰 Daily Volume Limit**: 일일 누적 거래금액 **100,000,000** 초과 시 차단
+- **🔢 Daily Count Limit**: 일일 주문 횟수 **1,000회** 초과 시 차단
+- **⚡ Rate Limit**: 분당 주문 **10회** 초과 시 일시 제한
+
+---
+
+## 📂 디렉토리 구조
+
+```
+src/main/java/org/tradinggate/backend/trading/
+│
+├── 📁 api/                      # Presentation Layer
+│   ├── 📁 controller/           # API Endpoints (Order, Query)
+│   ├── 📁 dto/                  # Data Transfer Objects (Request/Response)
+│   └── 📁 validator/            # Custom Validation Logic
+│
+├── 📁 service/                  # Business Layer
+│   ├── OrderService.java        # 주문 생성/취소 핵심 로직
+│   ├── OrderQueryService.java   # 주문 조회 최적화 로직
+│   ├── TradeQueryService.java   # 체결 내역 조회 로직
+│   └── RiskCheckService.java    # 리스크 관리 및 Redis 연동
+│
+├── 📁 domain/                   # Domain Entities
+│   └── (Order, Trade Entity...)
+│
+├── 📁 config/                   # Configuration
+│   └── (Trading Configs...)
+│
+└── 📘 README.md                 # 현재 문서
+```
+
+---
+
+## 🚀 API 사용 가이드
+
+본 모듈은 RESTful API를 제공하며, Notion에 기술된 [Trading API 명세]를 준수합니다.
+
+### 1. 주문 생성 (Order Creation)
+- **Endpoint**: `POST /api/orders/create`
+- **Response**: `202 Accepted` (비동기 처리)
+
+```json
+// Request Body Example
+{
+  "clientOrderId": "req-12345",
+  "symbol": "BTC/USDT",
+  "side": "BUY",
+  "type": "LIMIT",
+  "price": 50000.0,
+  "quantity": 0.1
+}
+```
+
+### 2. 주문 취소 (Cancel Order)
+- **Endpoint**: `POST /api/orders/cancel`
+- **Response**: `202 Accepted`
+
+```json
+// Request Body Example
+{
+  "clientOrderId": "req-12345",
+  "symbol": "BTC/USDT"
+}
+```
+
+### 3. 데이터 조회 (Query)
+- **Open Orders**: `GET /api/orders/open`
+- **Order History**: `GET /api/orders/history`
+- **Trade History**: `GET /api/trades/history`
+
+---
+
+## 🛠️ 향후 개선 계획
+
+- [ ] **JWT Authentication**: 현재 하드코딩된 `userId`를 Security Context 기반으로 변경
+- [ ] **Complex Order Types**: Stop-Loss, OCO 등 특수 주문 유형 지원 추가
+- [ ] **Circuit Breaker**: 급격한 변동성 발생 시 시스템 전체 주문 차단 기능 도입
+- [ ] **Performance Tuning**: Redis Pipeline 도입을 통한 리스크 체크 지연 시간 최소화
+
+---
+
+## 📧 Contact
+트레이딩 시스템 관련 문의는 Backend 팀 채널을 이용해 주세요.
