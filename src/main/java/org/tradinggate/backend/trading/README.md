@@ -75,8 +75,6 @@ src/main/java/org/tradinggate/backend/trading/
 
 ## 🚀 API 사용 가이드
 
-본 모듈은 RESTful API를 제공하며, Notion에 기술된 [Trading API 명세]를 준수합니다.
-
 ### 1. 주문 생성 (Order Creation)
 - **Endpoint**: `POST /api/orders/create`
 - **Response**: `202 Accepted` (비동기 처리)
