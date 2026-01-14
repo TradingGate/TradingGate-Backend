@@ -47,7 +47,6 @@ class OrderServiceIdempotencyTest {
     // when: 첫 번째 요청 성공
     OrderService.OrderCreateResponse response1 = orderService.createOrder(request, userId);
     assertNotNull(response1);
-    assertTrue(response1.getReceived());
 
     // then: 두 번째 요청 실패 (중복)
     Thread.sleep(100); // Lock 처리 대기

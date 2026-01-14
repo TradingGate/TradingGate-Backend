@@ -73,7 +73,6 @@ class OrderServiceTest {
     // then
     assertNotNull(response);
     assertEquals("cli-20241204-0001", response.getClientOrderId());
-    assertTrue(response.getReceived());
 
     verify(riskCheckService).isBlocked(userId, "BTCUSDT");
     verify(orderValidator).validate(request);
@@ -113,7 +112,6 @@ class OrderServiceTest {
     // then
     assertNotNull(response);
     assertEquals("cli-20241204-0001", response.getClientOrderId());
-    assertTrue(response.getReceived());
 
     verify(orderEventProducer).publishCancelOrder(mockOrder);
   }

@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * - 동기 전송 (get()으로 결과 대기)
  * - Retry 로직 내장 (200ms → 400ms → 800ms)
  */
-@Component
+@Component("tradingKafkaMessageProducer")
 @RequiredArgsConstructor
 @Log4j2
 public class KafkaMessageProducer {
