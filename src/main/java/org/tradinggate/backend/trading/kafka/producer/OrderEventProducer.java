@@ -1,8 +1,10 @@
 package org.tradinggate.backend.trading.kafka.producer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
+import org.tradinggate.backend.global.kafka.producer.KafkaMessageProducer;
 import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.SourceType;
 import org.tradinggate.backend.trading.kafka.event.OrderCancelEvent;
@@ -20,6 +22,7 @@ public class OrderEventProducer {
 
   private final KafkaMessageProducer kafkaMessageProducer;
   private final SourceType sourceType;
+  private final ObjectMapper objectMapper;
 
   private static final String ORDERS_IN_TOPIC = "orders.in";
 
@@ -31,7 +34,8 @@ public class OrderEventProducer {
 
     try {
       OrderCreateEvent event = OrderCreateEvent.from(order, sourceType);
-      kafkaMessageProducer.sendMessage(ORDERS_IN_TOPIC, event.getPartitionKey(), event);
+      String jsonPayload = objectMapper.writeValueAsString(event);
+      kafkaMessageProducer.sendAndWait(ORDERS_IN_TOPIC, event.getPartitionKey(), jsonPayload);
 
       log.info("[OrderEventProducer] 신규 주문 발행 성공: clientOrderId={}, commandType={}",
           order.getClientOrderId(), event.getCommandType());
@@ -39,7 +43,7 @@ public class OrderEventProducer {
     } catch (Exception e) {
       log.error("[OrderEventProducer] 신규 주문 발행 실패: clientOrderId={}",
           order.getClientOrderId(), e);
-      throw e;
+      throw new RuntimeException("신규 주문 이벤트 발행 중 오류 발생", e);
     }
   }
 
@@ -51,7 +55,8 @@ public class OrderEventProducer {
 
     try {
       OrderCancelEvent event = OrderCancelEvent.from(order, sourceType);
-      kafkaMessageProducer.sendMessage(ORDERS_IN_TOPIC, event.getPartitionKey(), event);
+      String jsonPayload = objectMapper.writeValueAsString(event);
+      kafkaMessageProducer.sendAndWait(ORDERS_IN_TOPIC, event.getPartitionKey(), jsonPayload);
 
       log.info("[OrderEventProducer] 주문 취소 발행 성공: clientOrderId={}, commandType={}",
           order.getClientOrderId(), event.getCommandType());
@@ -59,7 +64,7 @@ public class OrderEventProducer {
     } catch (Exception e) {
       log.error("[OrderEventProducer] 주문 취소 발행 실패: clientOrderId={}",
           order.getClientOrderId(), e);
-      throw e;
+      throw new RuntimeException("주문 취소 이벤트 발행 중 오류 발생", e);
     }
   }
 }

@@ -17,7 +17,7 @@ import org.tradinggate.backend.matching.engine.model.e.OrderStatus;
 import org.tradinggate.backend.matching.engine.model.e.OrderType;
 import org.tradinggate.backend.matching.engine.model.e.TimeInForce;
 import org.tradinggate.backend.matching.engine.service.KafkaMatchingEventPublisher;
-import org.tradinggate.backend.matching.engine.service.KafkaMessageProducer;
+import org.tradinggate.backend.global.kafka.producer.KafkaMessageProducer;
 import org.tradinggate.backend.matching.engine.util.MatchingProperties;
 
 import java.time.Instant;

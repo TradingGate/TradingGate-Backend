@@ -4,10 +4,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean; // MockBean 추가
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.kafka.core.KafkaTemplate; // KafkaTemplate 임포트
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.risk.domain.entity.Position;
-import org.tradinggate.backend.risk.event.TradeExecutedEvent; // 패키지 경로 확인!
+import org.tradinggate.backend.risk.event.TradeExecutedEvent;
 import org.tradinggate.backend.risk.repository.PositionRepository;
 
 import java.math.BigDecimal;
@@ -16,7 +19,8 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@Transactional // 테스트 끝나면 DB 롤백
+@Transactional
+@ActiveProfiles("test")
 class PositionServiceTest {
 
   @Autowired
@@ -26,7 +30,12 @@ class PositionServiceTest {
   private PositionRepository positionRepository;
 
   @Autowired
-  private ApplicationEventPublisher eventPublisher; // 이벤트 발행기
+  private ApplicationEventPublisher eventPublisher;
+
+  // [핵심 수정] Kafka 연결 실패 방지: 실제 연결 대신 Mock 객체 주입
+  // Kafka를 사용하는 서비스가 컨텍스트에 포함되어 있다면 필수입니다.
+  @MockBean
+  private KafkaTemplate<String, Object> kafkaTemplate;
 
   @Test
   @DisplayName("1. 초기 진입: 롱 포지션이 새로 생성되어야 한다")
@@ -42,8 +51,7 @@ class PositionServiceTest {
         .tradeTime(LocalDateTime.now())
         .build();
 
-    // When (이벤트 리스너가 호출하는 메서드를 직접 호출하거나, 이벤트를 발행)
-    // 여기서는 서비스 메서드를 직접 호출해서 테스트 (리스너 비동기 대기 문제 회피)
+    // When
     positionService.updatePosition(event);
 
     // Then
@@ -60,12 +68,22 @@ class PositionServiceTest {
     Long symbolId = 100L;
 
     // 1차 진입
-    positionService.updatePosition(new TradeExecutedEvent(accountId, symbolId,
-        new BigDecimal("1.0"), new BigDecimal("50000.0"), LocalDateTime.now()));
+    positionService.updatePosition(TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("1.0"))
+        .price(new BigDecimal("50000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build());
 
     // When (2차 진입 - 가격 상승)
-    TradeExecutedEvent event = new TradeExecutedEvent(accountId, symbolId,
-        new BigDecimal("1.0"), new BigDecimal("60000.0"), LocalDateTime.now());
+    TradeExecutedEvent event = TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("1.0"))
+        .price(new BigDecimal("60000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build();
 
     positionService.updatePosition(event);
 
@@ -85,13 +103,22 @@ class PositionServiceTest {
     Long symbolId = 100L;
 
     // 초기 셋팅 (2개, 55000불)
-    positionService.updatePosition(new TradeExecutedEvent(accountId, symbolId,
-        new BigDecimal("2.0"), new BigDecimal("55000.0"), LocalDateTime.now()));
+    positionService.updatePosition(TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("2.0"))
+        .price(new BigDecimal("55000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build());
 
     // When (1개 매도 @ 70,000불 - 익절)
-    // 매도니까 quantity는 음수(-1.0)
-    TradeExecutedEvent event = new TradeExecutedEvent(accountId, symbolId,
-        new BigDecimal("-1.0"), new BigDecimal("70000.0"), LocalDateTime.now());
+    TradeExecutedEvent event = TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("-1.0")) // 매도
+        .price(new BigDecimal("70000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build();
 
     positionService.updatePosition(event);
 

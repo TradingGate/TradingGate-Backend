@@ -1,4 +1,4 @@
-package org.tradinggate.backend.matching.engine.service;
+package org.tradinggate.backend.global.kafka.producer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -20,6 +20,7 @@ public class KafkaMessageProducer {
             maxAttempts = 3,
             backoff = @Backoff(delay = 200, multiplier = 2.0, maxDelay = 2000)
     )
+
     public void sendAndWait(String topic, String key, String payload) {
         try {
             kafkaTemplate.send(topic, key, payload).get();

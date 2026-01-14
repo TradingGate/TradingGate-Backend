@@ -25,7 +25,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import org.tradinggate.backend.matching.engine.service.KafkaMessageProducer;
+import org.tradinggate.backend.global.kafka.producer.KafkaMessageProducer;
 import org.tradinggate.backend.matching.snapshot.io.SnapshotPathResolver;
 
 import java.nio.file.Path;
