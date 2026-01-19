@@ -1,0 +1,137 @@
+package org.tradinggate.backend.risk.service;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean; // MockBean 추가
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.kafka.core.KafkaTemplate; // KafkaTemplate 임포트
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+import org.tradinggate.backend.risk.domain.entity.Position;
+import org.tradinggate.backend.risk.event.TradeExecutedEvent;
+import org.tradinggate.backend.risk.repository.PositionRepository;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest
+@Transactional
+@ActiveProfiles("test")
+class PositionServiceTest {
+
+  @Autowired
+  private PositionService positionService;
+
+  @Autowired
+  private PositionRepository positionRepository;
+
+  @Autowired
+  private ApplicationEventPublisher eventPublisher;
+
+  // [핵심 수정] Kafka 연결 실패 방지: 실제 연결 대신 Mock 객체 주입
+  // Kafka를 사용하는 서비스가 컨텍스트에 포함되어 있다면 필수입니다.
+  @MockBean
+  private KafkaTemplate<String, Object> kafkaTemplate;
+
+  @Test
+  @DisplayName("1. 초기 진입: 롱 포지션이 새로 생성되어야 한다")
+  void testInitialEntry() {
+    // Given
+    Long accountId = 1L;
+    Long symbolId = 100L;
+    TradeExecutedEvent event = TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("1.0")) // 1 BTC 매수
+        .price(new BigDecimal("50000.0")) // $50,000
+        .tradeTime(LocalDateTime.now())
+        .build();
+
+    // When
+    positionService.updatePosition(event);
+
+    // Then
+    Position position = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
+    assertThat(position.getQuantity()).isEqualByComparingTo("1.0");
+    assertThat(position.getAvgPrice()).isEqualByComparingTo("50000.0");
+  }
+
+  @Test
+  @DisplayName("2. 물타기: 평단가가 갱신되어야 한다 (5만 + 6만 = 5.5만)")
+  void testAveragePriceUpdate() {
+    // Given (초기 포지션 셋팅)
+    Long accountId = 2L;
+    Long symbolId = 100L;
+
+    // 1차 진입
+    positionService.updatePosition(TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("1.0"))
+        .price(new BigDecimal("50000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build());
+
+    // When (2차 진입 - 가격 상승)
+    TradeExecutedEvent event = TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("1.0"))
+        .price(new BigDecimal("60000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build();
+
+    positionService.updatePosition(event);
+
+    // Then
+    Position position = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
+
+    // 수량 2.0, 평단가 55,000
+    assertThat(position.getQuantity()).isEqualByComparingTo("2.0");
+    assertThat(position.getAvgPrice()).isEqualByComparingTo("55000.0");
+  }
+
+  @Test
+  @DisplayName("3. 부분 청산: 평단가는 유지되고, 실현손익이 발생해야 한다")
+  void testPartialClose() {
+    // Given (2개, 평단 55,000 보유 상태 가정)
+    Long accountId = 3L;
+    Long symbolId = 100L;
+
+    // 초기 셋팅 (2개, 55000불)
+    positionService.updatePosition(TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("2.0"))
+        .price(new BigDecimal("55000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build());
+
+    // When (1개 매도 @ 70,000불 - 익절)
+    TradeExecutedEvent event = TradeExecutedEvent.builder()
+        .accountId(accountId)
+        .symbolId(symbolId)
+        .quantity(new BigDecimal("-1.0")) // 매도
+        .price(new BigDecimal("70000.0"))
+        .tradeTime(LocalDateTime.now())
+        .build();
+
+    positionService.updatePosition(event);
+
+    // Then
+    Position position = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
+
+    // 남은 수량 1.0
+    assertThat(position.getQuantity()).isEqualByComparingTo("1.0");
+
+    // 평단가는 변하지 않음 (55,000 유지)
+    assertThat(position.getAvgPrice()).isEqualByComparingTo("55000.0");
+
+    // 실현손익: (70,000 - 55,000) * 1개 = 15,000 이득
+    assertThat(position.getRealizedPnl()).isEqualByComparingTo("15000.0");
+  }
+}

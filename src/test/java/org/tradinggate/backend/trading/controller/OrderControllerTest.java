@@ -64,7 +64,6 @@ class OrderControllerTest {
 
                 OrderService.OrderCreateResponse response = OrderService.OrderCreateResponse.builder()
                                 .clientOrderId("cli-20241204-0001")
-                                .received(true)
                                 .message("Order received")
                                 .build();
 
@@ -121,7 +120,6 @@ class OrderControllerTest {
 
                 OrderService.OrderCancelResponse response = OrderService.OrderCancelResponse.builder()
                                 .clientOrderId("cli-20241204-0001")
-                                .received(true)
                                 .message("Cancel request received")
                                 .build();
 

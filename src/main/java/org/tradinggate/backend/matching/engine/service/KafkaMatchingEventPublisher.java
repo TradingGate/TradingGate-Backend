@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.tradinggate.backend.global.kafka.producer.KafkaMessageProducer;
 import org.tradinggate.backend.matching.engine.model.MatchFill;
 import org.tradinggate.backend.matching.engine.model.OrderUpdate;
 import org.tradinggate.backend.matching.engine.util.MatchingProperties;

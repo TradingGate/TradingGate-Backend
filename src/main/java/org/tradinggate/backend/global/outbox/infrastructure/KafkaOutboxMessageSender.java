@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.global.outbox.domain.OutboxEvent;
-import org.tradinggate.backend.matching.engine.service.KafkaMessageProducer;
+import org.tradinggate.backend.global.kafka.producer.KafkaMessageProducer;
 
 import java.util.Map;
 
