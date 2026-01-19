@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.matching.snapshot.SnapshotCoordinator;
 import org.tradinggate.backend.matching.snapshot.writer.SnapshotWriteQueue;
@@ -22,6 +23,7 @@ import org.tradinggate.backend.matching.snapshot.writer.SnapshotWriteQueue;
  */
 @Log4j2
 @Component
+@Profile("worker")
 @RequiredArgsConstructor
 public class SnapshotShutdownManager {
 

@@ -1,15 +1,22 @@
 package org.tradinggate.backend.trading.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.admin.AdminClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.tradinggate.backend.global.exception.CustomException;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.domain.entity.OrderSide;
 import org.tradinggate.backend.trading.domain.entity.OrderType;
 import org.tradinggate.backend.trading.domain.entity.TimeInForce;
+import org.tradinggate.backend.trading.domain.repository.OrderRepository;
 
 import java.math.BigDecimal;
 import java.util.concurrent.CountDownLatch;
@@ -27,10 +34,27 @@ class OrderServiceIdempotencyTest {
   @Autowired
   private OrderService orderService;
 
+  @Autowired
+  private OrderRepository orderRepository;
+
+  @MockitoBean
+  private KafkaTemplate<String, Object> kafkaTemplate;
+
+  @MockitoBean
+  private RedisTemplate<String, Object> redisTemplate;
+
+  @MockitoBean
+  private RedissonClient redissonClient;
+
+  @MockitoBean
+  private AdminClient adminClient;
+
+  @Autowired
+  private ObjectMapper objectMapper;
+
   @Test
   @DisplayName("동일한 clientOrderId로 중복 요청 시 예외 발생")
   void createOrder_DuplicateClientOrderId_ThrowsException() throws InterruptedException {
-    // given
     Long userId = 1L;
     String clientOrderId = "cli-test-001";
 

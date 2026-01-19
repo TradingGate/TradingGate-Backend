@@ -21,7 +21,7 @@ import org.tradinggate.backend.trading.kafka.event.OrderCreateEvent;
 public class OrderEventProducer {
 
   private final KafkaMessageProducer kafkaMessageProducer;
-  private final SourceType sourceType;
+//  private final SourceType sourceType;
   private final ObjectMapper objectMapper;
 
   private static final String ORDERS_IN_TOPIC = "orders.in";
@@ -33,7 +33,7 @@ public class OrderEventProducer {
     log.info("[OrderEventProducer] 신규 주문 발행 시작: clientOrderId={}", order.getClientOrderId());
 
     try {
-      OrderCreateEvent event = OrderCreateEvent.from(order, sourceType);
+      OrderCreateEvent event = OrderCreateEvent.from(order, SourceType.API);
       String jsonPayload = objectMapper.writeValueAsString(event);
       kafkaMessageProducer.sendAndWait(ORDERS_IN_TOPIC, event.getPartitionKey(), jsonPayload);
 
@@ -54,7 +54,7 @@ public class OrderEventProducer {
     log.info("[OrderEventProducer] 주문 취소 발행 시작: clientOrderId={}", order.getClientOrderId());
 
     try {
-      OrderCancelEvent event = OrderCancelEvent.from(order, sourceType);
+      OrderCancelEvent event = OrderCancelEvent.from(order, SourceType.API);
       String jsonPayload = objectMapper.writeValueAsString(event);
       kafkaMessageProducer.sendAndWait(ORDERS_IN_TOPIC, event.getPartitionKey(), jsonPayload);
 

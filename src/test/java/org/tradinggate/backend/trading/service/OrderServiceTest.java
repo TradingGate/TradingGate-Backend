@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.tradinggate.backend.trading.api.dto.request.OrderCancelRequest;
 import org.tradinggate.backend.trading.api.dto.request.OrderCreateRequest;
 import org.tradinggate.backend.trading.domain.entity.OrderSide;
@@ -22,25 +23,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
-/**
- * OrderService 단위 테스트
- * 주의: @RedissonLock은 AOP이므로 Mock 테스트에서는 동작하지 않습니다.
- * 멱등성 테스트는 OrderServiceIdempotencyTest(통합 테스트)에서 수행합니다.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("주문 서비스 단위 테스트")
 class OrderServiceTest {
 
-  @Mock
+  @MockitoBean
   private OrderEventProducer orderEventProducer;
 
-  @Mock
+  @MockitoBean
   private RiskCheckService riskCheckService;
 
-  @Mock
+  @MockitoBean
   private OrderValidator orderValidator;
 
-  @Mock
+  @MockitoBean
   private OrderRepository orderRepository;
 
   @InjectMocks
