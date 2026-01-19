@@ -1,4 +1,4 @@
-package org.tradinggate.backend.clearing.policy;
+package org.tradinggate.backend.clearing.policy.e;
 
 public enum ClosingPriceType {
     CLOSE,

@@ -1,5 +1,8 @@
 package org.tradinggate.backend.clearing.policy;
 
+import org.tradinggate.backend.clearing.policy.e.ClosingPriceType;
+import org.tradinggate.backend.clearing.policy.e.ProductType;
+
 public interface SettlementPolicyResolver {
 
     /**

@@ -3,6 +3,8 @@ package org.tradinggate.backend.clearing.policy;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.tradinggate.backend.clearing.policy.e.ClosingPriceType;
+import org.tradinggate.backend.clearing.policy.e.ProductType;
 
 import java.util.HashMap;
 import java.util.Map;

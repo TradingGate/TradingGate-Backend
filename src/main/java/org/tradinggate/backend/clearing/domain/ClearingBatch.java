@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.tradinggate.backend.clearing.domain.e.ClearingBatchStatus;
+import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -15,11 +17,11 @@ import java.util.Map;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uq_clearing_batch_business_type",
-                        columnNames = {"business_date", "batch_type"}
+                        columnNames = {"business_date", "batch_type", "run_key", "attempt"}
                 )
         },
         indexes = {
-                @Index(name = "idx_clearing_batch_business_type", columnList = "business_date, batch_type"),
+                @Index(name = "idx_clearing_batch_business_type_run", columnList = "business_date, batch_type, run_key"),
                 @Index(name = "idx_clearing_batch_status_created", columnList = "status, created_at")
         }
 )
@@ -40,6 +42,15 @@ public class ClearingBatch {
     @Column(name="batch_type", nullable = false, length = 16)
     private ClearingBatchType batchType;
 
+    @Column(name = "run_key", nullable = false, length = 32)
+    private String runKey;
+
+    @Column(name = "attempt", nullable = false)
+    private int attempt;
+
+    @Column(name = "retry_of_batch_id")
+    private Long retryOfBatchId;
+
     @Enumerated(EnumType.STRING)
     @Column(name="status", nullable = false, length = 16)
     private ClearingBatchStatus status;
@@ -59,7 +70,7 @@ public class ClearingBatch {
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name="cutoff_offsets", nullable = false, columnDefinition = "jsonb")
-    private Map<String, Object> cutoffOffsets;
+    private Map<String, Long> cutoffOffsets;
 
     @Column(name="market_snapshot_id")
     private Long marketSnapshotId;
@@ -74,10 +85,12 @@ public class ClearingBatch {
     private Instant updatedAt;
 
     // === Factory methods ===
-    public static ClearingBatch pending(LocalDate businessDate, ClearingBatchType type, String scope) {
+    public static ClearingBatch pending(LocalDate businessDate, ClearingBatchType type, String runKey, int attempt, String scope) {
         return ClearingBatch.builder()
                 .businessDate(businessDate)
                 .batchType(type)
+                .runKey(runKey)
+                .attempt(attempt)
                 .scope(scope)
                 .status(ClearingBatchStatus.PENDING)
                 .cutoffOffsets(Map.of())
@@ -85,7 +98,7 @@ public class ClearingBatch {
     }
 
     // === Domain state transition methods ===
-    public void markRunning(Map<String, Object> cutoffOffsets, Long marketSnapshotId) {
+    public void markRunning(Map<String, Long> cutoffOffsets, Long marketSnapshotId) {
         this.status = ClearingBatchStatus.RUNNING;
         this.startedAt = Instant.now();
         this.cutoffOffsets = cutoffOffsets;

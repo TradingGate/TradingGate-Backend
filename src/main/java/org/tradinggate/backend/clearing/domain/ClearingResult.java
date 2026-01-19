@@ -2,6 +2,7 @@ package org.tradinggate.backend.clearing.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.tradinggate.backend.clearing.domain.e.ClearingResultStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;

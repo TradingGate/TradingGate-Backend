@@ -2,6 +2,8 @@ package org.tradinggate.backend.clearing.policy;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.tradinggate.backend.clearing.policy.e.ClosingPriceType;
+import org.tradinggate.backend.clearing.policy.e.ProductType;
 
 @Component
 @RequiredArgsConstructor

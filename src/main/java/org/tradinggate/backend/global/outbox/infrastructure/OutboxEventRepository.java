@@ -72,4 +72,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
          where e.status = 'FAILED' and e.createdAt >= :from
     """)
     int resetFailedSince(@Param("from") Instant from);
+
+    @Query(value = "select count(*) from outbox_event where idempotency_key like concat(?1, '%')", nativeQuery = true)
+    long countByIdempotencyKeyPrefix(String prefix);
 }
