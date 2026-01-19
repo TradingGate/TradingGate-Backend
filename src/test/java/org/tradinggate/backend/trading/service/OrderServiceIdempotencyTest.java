@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
@@ -46,15 +47,16 @@ import static org.mockito.Mockito.*;
 @EmbeddedKafka(
     partitions = 1,
     topics = {"orders.in"},
+    ports = {0},
     brokerProperties = {
-        "listeners=PLAINTEXT://localhost:9092",
-        "port=9092"
+        "auto.create.topics.enable=true"
     }
 )
 @TestPropertySource(properties = {
     "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
     "spring.kafka.producer.bootstrap-servers=${spring.embedded.kafka.brokers}",
-    "spring.kafka.consumer.enabled=false"
+    "spring.kafka.consumer.enabled=false",
+    "spring.kafka.admin.properties.request.timeout.ms=60000"
 })
 @ComponentScan(
     basePackages = "org.tradinggate.backend",
@@ -82,6 +84,12 @@ class OrderServiceIdempotencyTest {
 
   @MockitoBean
   private RedissonClient redissonClient;
+
+  @MockitoBean  // ← 추가
+  private RiskCheckService riskCheckService;
+
+  @MockitoBean  // ← 추가
+  private StringRedisTemplate stringRedisTemplate;
 
   @Mock
   private ValueOperations<String, Object> valueOperations;
