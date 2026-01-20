@@ -2,6 +2,7 @@ package org.tradinggate.backend.ledger.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.tradinggate.backend.ledger.domain.e.LedgerEntryType;
 
 import java.math.BigDecimal;
 import java.time.Instant;

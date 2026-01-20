@@ -1,6 +1,7 @@
 package org.tradinggate.backend.matching.snapshot.shutdown;
 
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   markProcessed 호출 시점을 재검토해야 한다.
  */
 @Component
+@Profile("worker")
 public class PartitionOffsetTracker {
 
     private final ConcurrentHashMap<TopicPartition, Long> lastProcessedOffset = new ConcurrentHashMap<>();

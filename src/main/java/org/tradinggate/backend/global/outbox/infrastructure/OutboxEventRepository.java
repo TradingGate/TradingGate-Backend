@@ -14,6 +14,27 @@ import java.util.Optional;
 
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> {
 
+    @Modifying
+    @Query(value = """
+        insert into outbox_event (
+            producer_type, event_type, aggregate_type, aggregate_id,
+            idempotency_key, payload, status, retry_count, last_error, created_at, updated_at
+        ) values (
+            :producerType, :eventType, :aggregateType, :aggregateId,
+            :idempotencyKey, cast(:payload as jsonb), :status, 0, null, now(), now()
+        )
+        on conflict (idempotency_key) do nothing
+        """, nativeQuery = true)
+    int insertIgnoreConflict(
+            @Param("producerType") String producerType,
+            @Param("eventType") String eventType,
+            @Param("aggregateType") String aggregateType,
+            @Param("aggregateId") Long aggregateId,
+            @Param("idempotencyKey") String idempotencyKey,
+            @Param("payload") String payloadJson,
+            @Param("status") String status
+    );
+
     /**
      * PENDING 이벤트를 락 걸고 가져온다.
      * - 반드시 @Transactional 컨텍스트에서 호출해야 함.

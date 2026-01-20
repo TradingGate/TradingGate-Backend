@@ -2,23 +2,25 @@ package org.tradinggate.backend.clearing.schedule;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
 import org.tradinggate.backend.clearing.service.ClearingBatchRunner;
 import org.tradinggate.backend.clearing.policy.ScheduledClearingBatchTriggerPolicy;
-import org.tradinggate.backend.clearing.service.ClearingOutboxService;
+import org.tradinggate.backend.clearing.service.ClearingOutboxRepairService;
 
 import java.time.LocalDate;
 
 @Log4j2
 @Component
 @RequiredArgsConstructor
+@Profile("clearing")
 public class ClearingSchedule {
 
     private final ClearingBatchRunner clearingBatchRunner;
     private final ScheduledClearingBatchTriggerPolicy scheduledPolicy;
-    private final ClearingOutboxService clearingOutboxService;
+    private final ClearingOutboxRepairService clearingOutboxRepairService;
 
     /**
      * 스케줄 트리거는 기본적으로 전체 대상(ALL)로 실행한다.
@@ -40,7 +42,7 @@ public class ClearingSchedule {
 
     @Scheduled(cron = "0 */5 * * * *") // 5분마다
     public void repair() {
-        int repaired = clearingOutboxService.repairRecentSuccessBatches();
+        int repaired = clearingOutboxRepairService.repairRecentSuccessBatches();
         if (repaired > 0) {
             log.info("[CLEARING][REPAIR] repairedBatches={}", repaired);
         }

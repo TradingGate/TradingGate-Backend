@@ -1,4 +1,4 @@
-package org.tradinggate.backend.recon.domain;
+package org.tradinggate.backend.ledger.domain;
 
 import jakarta.persistence.*;
 import lombok.*;

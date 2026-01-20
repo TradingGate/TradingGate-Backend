@@ -2,6 +2,7 @@ package org.tradinggate.backend.global.outbox.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.outbox.infrastructure.KafkaOutboxMessageSender;
@@ -14,6 +15,7 @@ import java.util.List;
 @Log4j2
 @Service
 @RequiredArgsConstructor
+@Profile({"clearing", "risk"})
 public class OutboxPublisher {
 
     private final OutboxEventRepository outboxEventRepository;

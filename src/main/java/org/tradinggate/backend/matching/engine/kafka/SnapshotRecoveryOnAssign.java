@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.listener.ConsumerAwareRebalanceListener;
 import org.tradinggate.backend.matching.snapshot.SnapshotCoordinator;
 import org.tradinggate.backend.matching.snapshot.dto.PartitionRecoveryResult;
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Log4j2
 @RequiredArgsConstructor
+@Profile("worker")
 public class SnapshotRecoveryOnAssign implements ConsumerAwareRebalanceListener {
 
     private final PartitionStateService partitionStateService;

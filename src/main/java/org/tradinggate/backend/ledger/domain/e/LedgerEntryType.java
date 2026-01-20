@@ -1,4 +1,5 @@
-package org.tradinggate.backend.ledger.domain;
+package org.tradinggate.backend.ledger.domain.e;
+
 
 public enum LedgerEntryType {
     TRADE_FEE,

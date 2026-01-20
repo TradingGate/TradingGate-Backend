@@ -1,6 +1,7 @@
 package org.tradinggate.backend.clearing.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import static org.tradinggate.backend.clearing.service.port.ClearingBatchContext
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Profile("clearing")
 public class ClearingBatchService {
 
     private final ClearingBatchRepository clearingBatchRepository;

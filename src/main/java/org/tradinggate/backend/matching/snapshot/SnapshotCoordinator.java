@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.kafka.common.utils.Utils;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.matching.engine.kafka.TopicPartitionCountProvider;
 import org.tradinggate.backend.matching.engine.model.OrderBook;
@@ -35,6 +36,7 @@ import org.tradinggate.backend.matching.snapshot.writer.SnapshotWriteQueue;
 @Log4j2
 @Component
 @RequiredArgsConstructor
+@Profile("worker")
 public class SnapshotCoordinator {
 
     private final OrderBookRegistry orderBookRegistry;

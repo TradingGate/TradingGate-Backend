@@ -1,6 +1,7 @@
 package org.tradinggate.backend.clearing.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.clearing.domain.ClearingBatch;
@@ -14,6 +15,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Profile("clearing")
 public class ClearingResultWriter {
 
     private final JdbcTemplate jdbcTemplate;

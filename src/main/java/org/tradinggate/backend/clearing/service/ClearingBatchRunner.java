@@ -2,6 +2,7 @@ package org.tradinggate.backend.clearing.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.tradinggate.backend.clearing.domain.ClearingBatch;
 import org.tradinggate.backend.clearing.domain.e.ClearingFailureCode;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 @Log4j2
 @Service
 @RequiredArgsConstructor
+@Profile("clearing")
 public class ClearingBatchRunner {
     private final ClearingBatchService clearingBatchService;
     private final ClearingBatchContextProvider provider;

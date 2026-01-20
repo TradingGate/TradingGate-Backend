@@ -7,6 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -37,14 +38,12 @@ import java.util.Map;
 @Configuration
 @EnableKafka
 @EnableRetry
-@EnableConfigurationProperties(MatchingProperties.class)
 @RequiredArgsConstructor
 public class KafkaConfig {
 
     @Value("${spring.kafka.consumer.group-id}")
     private String groupId;
 
-    private final MatchingProperties matchingProperties;
     // ==========================
     // Consumer Factory
     // ==========================
@@ -68,12 +67,16 @@ public class KafkaConfig {
     // ==========================
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> consumerFactory, SnapshotRecoveryOnAssign rebalanceListener, View error) {
+            ConsumerFactory<String, String> consumerFactory, ObjectProvider<SnapshotRecoveryOnAssign> rebalanceListener) {
 
         var factory = new ConcurrentKafkaListenerContainerFactory<String, String>();
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        factory.getContainerProperties().setConsumerRebalanceListener(rebalanceListener);
+        SnapshotRecoveryOnAssign listener = rebalanceListener.getIfAvailable();
+        if (listener != null) {
+            factory.getContainerProperties().setConsumerRebalanceListener(listener);
+        }
+
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(300L, 5L));
         errorHandler.setAckAfterHandle(false);
         errorHandler.addNotRetryableExceptions(
@@ -111,27 +114,4 @@ public class KafkaConfig {
         return new KafkaTemplate<>(pf);
     }
 
-    @Bean
-    public SnapshotRecoveryOnAssign snapshotRecoveryOnAssign(
-            PartitionStateService partitionStateService,
-            AssignedPartitionTracker tracker,
-            @Value("${tradinggate.matching.orders-in-topic}") String topic
-    ) {
-        return new SnapshotRecoveryOnAssign(partitionStateService, tracker, topic);
-    }
-
-    @Bean
-    public PartitionStateService partitionStateService(
-            ObjectMapper objectMapper,
-            OrderBookRegistry registry,
-            PartitionCountProvider partitionCountProvider,
-            SnapshotCoordinator snapshotCoordinator,
-            PartitionOffsetTracker tracker
-    ){
-        SnapshotPathResolver pathResolver = new SnapshotPathResolver(matchingProperties.getBaseDir());
-        SnapshotLoader snapshotLoader = new SnapshotLoader(pathResolver, objectMapper, matchingProperties.getFallbackCount());
-        SnapshotRestorer snapshotRestorer = new SnapshotRestorer();
-
-        return new PartitionStateService(snapshotLoader, snapshotRestorer, registry, partitionCountProvider, snapshotCoordinator, tracker);
-    }
 }

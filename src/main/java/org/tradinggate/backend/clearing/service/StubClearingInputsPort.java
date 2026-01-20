@@ -2,6 +2,7 @@ package org.tradinggate.backend.clearing.service;
 
 import lombok.extern.log4j.Log4j2;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.clearing.dto.ClearingScopeSpec;
 import org.tradinggate.backend.clearing.service.port.ClearingInputsPort;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 @Log4j2
 @Component
 @RequiredArgsConstructor
+@Profile("clearing")
 public class StubClearingInputsPort implements ClearingInputsPort {
 
     private final ClearingScopeSpecParser scopeParser;

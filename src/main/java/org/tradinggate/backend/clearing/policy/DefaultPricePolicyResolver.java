@@ -1,6 +1,7 @@
 package org.tradinggate.backend.clearing.policy;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.clearing.service.port.ClearingInputsPort;
 
@@ -10,6 +11,7 @@ import static org.tradinggate.backend.clearing.service.port.ClearingInputsPort.*
 
 @Component
 @RequiredArgsConstructor
+@Profile("clearing")
 public class DefaultPricePolicyResolver implements PricePolicyResolver {
 
     private final ClearingInputsPort inputs;

@@ -3,6 +3,7 @@ package org.tradinggate.backend.matching.engine.service;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.matching.engine.model.*;
 import org.tradinggate.backend.matching.engine.model.e.OrderSide;
@@ -30,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @Getter
 @RequiredArgsConstructor(access = AccessLevel.PUBLIC)
+@Profile("worker")
 public class MatchingEngineImpl implements MatchingEngine {
 
     private final OrderBookRegistry orderBookRegistry;

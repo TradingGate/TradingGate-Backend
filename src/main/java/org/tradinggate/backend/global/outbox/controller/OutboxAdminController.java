@@ -1,6 +1,7 @@
 package org.tradinggate.backend.global.outbox.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 import org.tradinggate.backend.global.outbox.service.OutboxAdminService;
 
@@ -11,6 +12,7 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/internal/outbox")
+@Profile({"clearing", "risk"})
 public class OutboxAdminController {
 
     private final OutboxAdminService outboxAdminService;

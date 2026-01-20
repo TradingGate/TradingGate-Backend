@@ -1,6 +1,7 @@
 package org.tradinggate.backend.clearing.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.tradinggate.backend.clearing.domain.ClearingBatch;
 import org.tradinggate.backend.clearing.dto.ClearingResultRow;
@@ -21,6 +22,7 @@ import static org.tradinggate.backend.clearing.service.port.ClearingInputsPort.*
  */
 @Service
 @RequiredArgsConstructor
+@Profile("clearing")
 public class DefaultClearingCalculator implements ClearingCalculator {
 
     private final ClearingInputsPort inputs;

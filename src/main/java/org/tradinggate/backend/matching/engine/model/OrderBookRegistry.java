@@ -1,6 +1,7 @@
 package org.tradinggate.backend.matching.engine.model;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.matching.engine.kafka.PartitionCountProvider;
 import org.tradinggate.backend.matching.snapshot.util.SnapshotCryptoUtils;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Profile("worker")
 public class OrderBookRegistry {
 
     private final PartitionCountProvider partitionCountProvider;

@@ -19,8 +19,6 @@ public interface ClearingResultRepository extends JpaRepository<ClearingResult, 
 
     Optional<ClearingResult> findByBatchIdAndAccountIdAndSymbolId(Long batchId, Long accountId, Long symbolId);
 
-    List<ClearingResult> findByBusinessDateAndAccountId(Long businessDate, Long accountId); // (주의) 타입 맞추기용 아래 제공
-
     List<ClearingResult> findByBusinessDateAndAccountId(LocalDate businessDate, Long accountId);
 
     Optional<ClearingResult> findTop1ByAccountIdAndSymbolIdOrderByBusinessDateDesc(Long accountId, Long symbolId);
