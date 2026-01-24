@@ -16,6 +16,8 @@ public class PositionService {
 
   private final PositionRepository positionRepository;
   private final PnlService pnlService; // PnL 계산은 별도 서비스로 위임
+  //리스크 관리 서비스 주입
+  private final RiskManagementService riskManagementService;
 
   @Transactional
   public void updatePosition(TradeExecutedEvent event) {
@@ -59,5 +61,11 @@ public class PositionService {
       position.decreasePosition(tradeQty, realizedPnl);
     }
     positionRepository.save(position);
+
+    // 1. 한도 체크 (Max Position Limit)
+    riskManagementService.checkPositionLimit(accountId);
+
+    // 2. 마진 및 청산 레벨 체크 (Liquidation Check)
+    riskManagementService.evaluateMargin(accountId);
   }
 }

@@ -1,0 +1,40 @@
+spring:
+  config:
+    activate:
+      on-profile: risk
+
+  # [중요] 테스트는 PostgreSQL 대신 메모리 DB(H2)를 사용합니다.
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  # JPA 설정: 테스트 시작 시 테이블을 생성(create)하고 끝나면 삭제(drop)합니다.
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true # 실행되는 쿼리를 예쁘게 보여줍니다.
+    show-sql: true
+
+  # [중요] Redis 설정 (테스트용)
+  # Embedded Redis를 쓰지 않는다면 로컬 Redis에 붙거나,
+  # Mocking을 해야 하는데 일단 기본 설정은 넣어두는 게 안전합니다.
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  kafka:
+    consumer:
+      group-id: test-risk-group
+      auto-offset-reset: earliest
+
+tradinggate:
+  role: risk
+  topics:
+    trades-executed: trades.executed
+    risk-commands: risk.commands
+    clearing-settlement: clearing.settlement
