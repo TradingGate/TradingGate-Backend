@@ -236,30 +236,3 @@ tradinggate:
   topics:
     trades-executed: trades.executed
     orders-updated: orders.updated
-
-# ============================================
-#  Profile: test
-# ============================================
----
-spring:
-  config:
-    activate:
-      on-profile: test
-
-  datasource:
-    # 아래 url 라인을 수정하세요. (INIT 부분 추가)
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS "jsonb" AS json
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  # Hibernate가 H2 Dialect를 사용하도록 명시 (선택사항이지만 권장)
-  jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-
-  kafka:
-    consumer:
-      group-id: test-group

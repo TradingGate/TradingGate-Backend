@@ -2,9 +2,9 @@ package org.tradinggate.backend.risk.service;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean; // MockBean 추가
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.core.KafkaTemplate; // KafkaTemplate 임포트
 import org.springframework.test.context.ActiveProfiles;
@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-@ActiveProfiles("test")
+@ActiveProfiles("risk")
 class PositionServiceTest {
 
   @Autowired
@@ -34,7 +34,7 @@ class PositionServiceTest {
 
   // [핵심 수정] Kafka 연결 실패 방지: 실제 연결 대신 Mock 객체 주입
   // Kafka를 사용하는 서비스가 컨텍스트에 포함되어 있다면 필수입니다.
-  @MockBean
+  @Mock
   private KafkaTemplate<String, Object> kafkaTemplate;
 
   @Test

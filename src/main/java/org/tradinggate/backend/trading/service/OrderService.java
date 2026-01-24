@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.aop.redisson.RedissonLock;
@@ -45,7 +46,7 @@ public class OrderService {
 
     orderRepository.findByUserIdAndClientOrderId(userId, request.getClientOrderId())
         .ifPresent(existingOrder -> {
-          log.warn(" Duplicate order detected: userId={}, clientOrderId={}",
+          log.warn("Duplicate order detected (App Check): userId={}, clientOrderId={}",
               userId, request.getClientOrderId());
           throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);
         });
@@ -67,17 +68,23 @@ public class OrderService {
         request.getPrice(),
         request.getQuantity());
 
-    orderRepository.save(order);
+    try {
+      // [중요] DB 저장 시도
+      orderRepository.save(order);
+    } catch (DataIntegrityViolationException e) {
+      // [핵심 수정] DB 레벨에서 중복 키 충돌 발생 시 예외 변환
+      log.error("Duplicate order detected (DB Constraint): userId={}, clientOrderId={}",
+          userId, request.getClientOrderId());
+      throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);
+    }
 
     orderEventProducer.publishNewOrder(order);
 
-    // 4. 응답 반환
     return OrderCreateResponse.builder()
         .clientOrderId(order.getClientOrderId())
         .status("ACCEPTED")
         .message("Order received")
         .build();
-
   }
 
   /** 주문 취소 */
