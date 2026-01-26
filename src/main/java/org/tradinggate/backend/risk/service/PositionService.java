@@ -1,6 +1,7 @@
 package org.tradinggate.backend.risk.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.risk.domain.entity.Position;
@@ -12,6 +13,7 @@ import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
+@Profile("risk")
 public class PositionService {
 
   private final PositionRepository positionRepository;

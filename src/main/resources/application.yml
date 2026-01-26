@@ -210,6 +210,16 @@ tradinggate:
     trades-executed: trades.executed
     clearing-settlement: clearing.settlement
 
+settlement:
+  policy:
+    default-product-type: SPOT
+    symbol-product-type:
+      1: SPOT
+      2: DERIVATIVE
+    mtm-override:
+      2: true
+    closing-price-override:
+      2: MARK
 
 # ============================================
 #  Profile: projection

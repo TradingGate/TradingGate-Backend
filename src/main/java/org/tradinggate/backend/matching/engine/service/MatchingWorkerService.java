@@ -1,6 +1,7 @@
 package org.tradinggate.backend.matching.engine.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.tradinggate.backend.matching.engine.model.MatchResult;
 import org.tradinggate.backend.matching.engine.model.OrderCommand;
@@ -18,6 +19,7 @@ import org.tradinggate.backend.matching.engine.model.OrderCommand;
  */
 @Service
 @RequiredArgsConstructor
+@Profile("worker")
 public class MatchingWorkerService {
 
     private final MatchingEngine matchingEngine;

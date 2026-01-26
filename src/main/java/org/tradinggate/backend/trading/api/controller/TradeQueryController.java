@@ -1,6 +1,7 @@
 package org.tradinggate.backend.trading.api.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -24,6 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/trades")
 @RequiredArgsConstructor
+@Profile("api")
 public class TradeQueryController {
 
   private final TradeQueryService tradeQueryService;
