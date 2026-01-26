@@ -36,7 +36,7 @@ class RiskManagementServiceTest {
   @Autowired
   private PositionRepository positionRepository;
 
-  @MockitoBean // Kafka 전송 검증용 Mock
+  @MockitoBean
   private KafkaTemplate<String, Object> kafkaTemplate;
 
   private final Long USER_ID = 10L;
@@ -128,6 +128,25 @@ class RiskManagementServiceTest {
     // Then
     UserRiskProfile profile = riskProfileRepository.findById(USER_ID).orElseThrow();
     assertThat(profile.getStatus()).isEqualTo(RiskStatus.WARNING);
+  }
+
+  @Test
+  @DisplayName("B-3: 마진 비율이 정상이면 NORMAL 상태를 유지한다")
+  void testEvaluateMargin_Normal() {
+    // Given
+    // 잔고 $100,000, 포지션 $50,000
+    // 비율 = 10만 / 5만 = 2.0 (200%) -> 정상
+    savePosition(USER_ID, SYMBOL_ID, "1.0", "50000.0");
+
+    // When
+    riskManagementService.evaluateMargin(USER_ID);
+
+    // Then
+    UserRiskProfile profile = riskProfileRepository.findById(USER_ID).orElseThrow();
+    assertThat(profile.getStatus()).isEqualTo(RiskStatus.NORMAL);
+
+    // Kafka 메시지 없어야 함
+    verify(kafkaTemplate, times(0)).send(anyString(), anyString(), anyString());
   }
 
   // 테스트용 포지션 생성 헬퍼

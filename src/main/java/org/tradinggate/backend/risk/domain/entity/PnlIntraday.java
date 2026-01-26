@@ -42,8 +42,37 @@ public class PnlIntraday {
   @Column(name = "snapshot_time", nullable = false)
   private LocalDateTime snapshotTime;
 
+  public static PnlIntraday create(LocalDate businessDate, Long accountId, Long symbolId) {
+    PnlIntraday pnl = new PnlIntraday();
+    pnl.businessDate = businessDate;
+    pnl.accountId = accountId;
+    pnl.symbolId = symbolId;
+    pnl.realizedPnl = BigDecimal.ZERO;
+    pnl.unrealizedPnl = BigDecimal.ZERO;
+    pnl.fee = BigDecimal.ZERO;
+    pnl.snapshotTime = LocalDateTime.now();
+    return pnl;
+  }
+
+  public void addRealizedPnl(BigDecimal amount) {
+    this.realizedPnl = this.realizedPnl.add(amount);
+    this.snapshotTime = LocalDateTime.now();
+  }
+
+  public void setUnrealizedPnl(BigDecimal amount) {
+    this.unrealizedPnl = amount;
+    this.snapshotTime = LocalDateTime.now();
+  }
+
+  public void addFee(BigDecimal amount) {
+    this.fee = this.fee.add(amount);
+    this.snapshotTime = LocalDateTime.now();
+  }
+
   @PrePersist
   public void onPrePersist() {
-    this.snapshotTime = LocalDateTime.now();
+    if (this.snapshotTime == null) {
+      this.snapshotTime = LocalDateTime.now();
+    }
   }
 }

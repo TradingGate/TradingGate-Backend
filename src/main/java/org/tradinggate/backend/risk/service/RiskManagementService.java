@@ -28,7 +28,7 @@ public class RiskManagementService {
   private static final String RISK_COMMAND_TOPIC = "risk.commands";
 
   /**
-   * B-2: 포지션 한도 체크
+   * 포지션 한도 체크
    * 새로운 체결이 발생했을 때, 유저가 한도를 초과했는지 검사합니다.
    */
   public void checkPositionLimit(Long userId) {
@@ -43,19 +43,19 @@ public class RiskManagementService {
     log.info("Risk Check [Limit]: User={}, Exposure={}, Max={}", userId, totalExposure, profile.getMaxPositionValue());
 
     if (totalExposure.compareTo(profile.getMaxPositionValue()) > 0) {
-      log.warn("🚨 Limit Exceeded! Blocking user {}", userId);
+      log.warn(" Limit Exceeded! Blocking user {}", userId);
       blockUser(profile, "POSITION_LIMIT_EXCEEDED");
     }
   }
 
   /**
-   * B-3: 마진콜 및 강제 청산 체크
+   * 마진콜 및 강제 청산 체크
    * 현재가(Mark Price)가 변동되거나 PnL이 변했을 때 호출됩니다.
    */
   public void evaluateMargin(Long userId) {
     UserRiskProfile profile = getProfileOrThrow(userId);
 
-    // TODO: 나중에 WalletService를 연결해야 함. 지금은 임시로 잔고 100,000 가정
+    // TODO: 나중에 WalletService를 연결해야 함. 임시로 잔고 100,000
     BigDecimal walletBalance = new BigDecimal("100000");
 
     // 포지션 조회
@@ -68,7 +68,7 @@ public class RiskManagementService {
 
     if (totalExposure.compareTo(BigDecimal.ZERO) == 0) return;
 
-    // 미실현 손익 (Unrealized PnL) - 임시로 0 처리
+    // 미실현 손익 (Unrealized PnL)
     BigDecimal totalUnrealizedPnl = BigDecimal.ZERO;
 
     // 자산(Equity) 계산
@@ -81,17 +81,17 @@ public class RiskManagementService {
 
     // 상태 체크 로직 (BLOCKED, WARNING, NORMAL)
     if (marginRatio.compareTo(profile.getLiquidationThreshold()) < 0) {
-      log.error("💀 LIQUIDATION TRIGGERED! User={}", userId);
+      log.error(" LIQUIDATION TRIGGERED! User={}", userId);
       blockUser(profile, "LIQUIDATION");
       sendRiskCommand(userId, "FORCE_CLOSE_ALL", "Margin ratio fell below threshold");
     } else if (marginRatio.compareTo(profile.getMarginCallThreshold()) < 0) {
       if (profile.getStatus() == RiskStatus.NORMAL) {
-        log.warn("⚠️ MARGIN CALL! User={}", userId);
+        log.warn("️ MARGIN CALL! User={}", userId);
         profile.updateStatus(RiskStatus.WARNING);
       }
     } else {
       if (profile.getStatus() != RiskStatus.NORMAL && profile.getStatus() != RiskStatus.BLOCKED) {
-        log.info("✅ Risk Status Restored: User={}", userId);
+        log.info(" Risk Status Restored: User={}", userId);
         profile.updateStatus(RiskStatus.NORMAL);
       }
     }
@@ -113,7 +113,6 @@ public class RiskManagementService {
   private UserRiskProfile getProfileOrThrow(Long userId) {
     return riskProfileRepository.findById(userId)
         .orElseGet(() -> {
-          // 프로필 없으면 기본값 생성
           UserRiskProfile newProfile = UserRiskProfile.createDefault(userId);
           return riskProfileRepository.save(newProfile);
         });
