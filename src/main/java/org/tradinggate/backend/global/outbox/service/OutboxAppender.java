@@ -15,13 +15,13 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 @Profile({"clearing", "risk"})
 public class OutboxAppender {
 
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
+    @Transactional
     public void append(
             OutboxProducerType producerType,
             String eventType,

@@ -19,7 +19,6 @@ import java.util.Optional;
 
 public interface ClearingBatchRepository extends JpaRepository<ClearingBatch, Long> {
 
-    @EntityGraph(attributePaths = "status")
     Optional<ClearingBatch> findByBusinessDateAndBatchTypeAndRunKeyAndAttempt(
             LocalDate businessDate,
             ClearingBatchType batchType,
@@ -78,5 +77,11 @@ public interface ClearingBatchRepository extends JpaRepository<ClearingBatch, Lo
             ClearingBatchStatus status,
             Instant createdAt,
             Pageable pageable
+    );
+
+    Optional<ClearingBatch> findTopByBusinessDateAndBatchTypeAndScopeOrderByIdDesc(
+            LocalDate businessDate,
+            ClearingBatchType batchType,
+            String scope
     );
 }

@@ -14,12 +14,4 @@ public interface ClearingResultRepository extends JpaRepository<ClearingResult, 
     long countByBatch_Id(Long batchId);
 
     Page<ClearingResult> findByBatchId(Long batchId, Pageable pageable);
-
-    List<ClearingResult> findByBatchId(Long batchId);
-
-    Optional<ClearingResult> findByBatchIdAndAccountIdAndSymbolId(Long batchId, Long accountId, Long symbolId);
-
-    List<ClearingResult> findByBusinessDateAndAccountId(LocalDate businessDate, Long accountId);
-
-    Optional<ClearingResult> findTop1ByAccountIdAndSymbolIdOrderByBusinessDateDesc(Long accountId, Long symbolId);
 }

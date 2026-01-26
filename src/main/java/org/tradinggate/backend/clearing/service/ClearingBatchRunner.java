@@ -8,7 +8,10 @@ import org.tradinggate.backend.clearing.domain.ClearingBatch;
 import org.tradinggate.backend.clearing.domain.e.ClearingFailureCode;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchStatus;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
+import org.tradinggate.backend.clearing.dto.ClearingComputationContext;
+import org.tradinggate.backend.clearing.dto.ClearingScopeSpec;
 import org.tradinggate.backend.clearing.policy.ClearingBatchTriggerPolicy;
+import org.tradinggate.backend.clearing.service.support.ClearingScopeSpecParser;
 import org.tradinggate.backend.clearing.policy.ClearingTriggerDecision;
 import org.tradinggate.backend.clearing.policy.e.ClearingTriggerDecisionType;
 import org.tradinggate.backend.clearing.service.port.ClearingBatchContextProvider;
@@ -22,12 +25,16 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 @Profile("clearing")
 public class ClearingBatchRunner {
+
     private final ClearingBatchService clearingBatchService;
     private final ClearingBatchContextProvider provider;
 
     private final ClearingResultWriter clearingResultWriter;
     private final ClearingOutboxService clearingOutboxService;
     private final ClearingCalculator clearingCalculator;
+
+    private final ClearingScopeSpecParser scopeParser;
+    private final ClearingBatchContextValidator clearingBatchContextValidator;
 
     /**
      * Clearing 배치 실행을 트리거한다.
@@ -52,25 +59,32 @@ public class ClearingBatchRunner {
             return;
         }
 
-        ClearingBatchContext clearingBatchContext;
-
+        ClearingBatchContext batchContext;
         try {
-            clearingBatchContext = provider.resolve(batchType, scope);
+            batchContext = provider.resolve(businessDate, batchType, scope);
         } catch (Exception e) {
             clearingBatchService.markFailed(batch.getId(), ClearingFailureCode.CUTOFF_RESOLVE_FAILED, summarize(e));
             throw e;
         }
 
-        boolean acquired = clearingBatchService.tryMarkRunning(batch.getId(), clearingBatchContext);
+        clearingBatchContextValidator.validate(batch.getId(), batchType, scope, batchContext);
+
+        boolean acquired = clearingBatchService.tryMarkRunning(batch.getId(), batchContext);
         if (!acquired) {
             log.info("[CLEARING] not acquired. batchId={} code={}", batch.getId(), ClearingFailureCode.BATCH_NOT_ACQUIRED.getCode());
             return;
         }
 
+        // tryMarkRunning은 UPDATE 쿼리로 기준점을 저장하므로, 이후 단계는 DB의 확정 값을 기준으로 진행해야 한다.
+        batch = clearingBatchService.findById(batch.getId());
+
+        // scope는 여기서 한 번만 파싱해서 ctx에 고정
+        ClearingScopeSpec spec = scopeParser.parse(batch.getScope());
+        ClearingComputationContext ctx = ClearingComputationContext.from(batch, spec);
+
         try {
-            // TODO(B-5): 계산/결과 저장 (CR-03/CR-04)
-            clearingResultWriter.upsertResults(batch, clearingCalculator.calculate(batch));
-            // TODO(B-5): outbox 이벤트 적재 (CR-07)
+            clearingResultWriter.upsertResults(batch, clearingCalculator.calculate(ctx));
+
             clearingOutboxService.enqueueSettlementEvents(batch.getId());
 
             clearingBatchService.markSuccess(batch.getId());

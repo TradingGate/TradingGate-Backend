@@ -32,7 +32,7 @@ public class OutboxPublisher {
         int batchSize = outboxProperties.getBatchSize();
         int maxRetries = outboxProperties.getMaxRetries();
 
-        List<OutboxEvent> events = outboxEventRepository.lockAndLoadPending(batchSize);
+        List<OutboxEvent> events = outboxEventRepository.lockAndLoadPending(batchSize, outboxProperties.getMaxRetries());
         if (events.isEmpty()) {
             return 0;
         }
@@ -48,7 +48,7 @@ public class OutboxPublisher {
                 log.warn("[OUTBOX] publish failed. id={}, type={}, idemKey={}, err={}",
                         event.getId(), event.getEventType(), event.getIdempotencyKey(), err);
 
-                event.markFailed(err, maxRetries);
+                event.markPublishFailed(err, maxRetries);
             }
         }
         return success;

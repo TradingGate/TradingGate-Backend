@@ -27,6 +27,8 @@ public class YamlSettlementPolicyResolver implements SettlementPolicyResolver {
     public ClosingPriceType closingPriceType(long symbolId) {
         ClosingPriceType override = props.getClosingPriceOverride().get(symbolId);
         if (override != null) return override;
+
+        // 기본 정책: SPOT=CLOSE, DERIVATIVE=MARK
         return SettlementPolicyResolver.super.closingPriceType(symbolId);
     }
 }

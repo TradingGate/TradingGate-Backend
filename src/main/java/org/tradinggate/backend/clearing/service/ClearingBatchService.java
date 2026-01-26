@@ -4,13 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.clearing.domain.ClearingBatch;
 import org.tradinggate.backend.clearing.domain.e.ClearingFailureCode;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchStatus;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
 import org.tradinggate.backend.clearing.repository.ClearingBatchRepository;
-import org.tradinggate.backend.clearing.service.port.ClearingBatchContextProvider;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,7 +20,6 @@ import static org.tradinggate.backend.clearing.service.port.ClearingBatchContext
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 @Profile("clearing")
 public class ClearingBatchService {
 
@@ -28,16 +27,23 @@ public class ClearingBatchService {
 
     private static final int INTRADAY_BUCKET_MINUTES = 10;
 
+    @Transactional(readOnly = true)
+    public ClearingBatch findById(Long id) {
+        return clearingBatchRepository.findById(id).orElseThrow(() -> new IllegalStateException("ClearingBatch not found after acquire. batchId=" + id));
+    }
+
     /**
      * ClearingBatch 실행 단위를 관리
      * - (businessDate, batchType, runKey, attempt) 유니크를 기준으로 배치 중복 생성을 방지
      * - RUNNING 선점은 "UPDATE ... WHERE status=PENDING"으로 원자적으로 처리
      */
+    @Transactional
     public ClearingBatch getOrCreatePending(LocalDate businessDate, ClearingBatchType batchType, String scope) {
         String runKey = defaultRunKey(batchType);
         return getOrCreatePending(businessDate, batchType, runKey, 1, normalizeScope(scope));
     }
 
+    @Transactional
     public ClearingBatch getOrCreatePending(LocalDate businessDate, ClearingBatchType batchType, String runKey, int attempt, String scope) {
         String normalizedScope = normalizeScope(scope);
         return clearingBatchRepository.findByBusinessDateAndBatchTypeAndRunKeyAndAttempt(businessDate, batchType, runKey, attempt)
@@ -53,6 +59,7 @@ public class ClearingBatchService {
      * @return 선점 성공 여부 (true면 이번 실행자가 배치를 수행)
      * @sideEffect 성공 시 배치 상태/startedAt/cutoffOffsets/marketSnapshotId가 변경된다.
      */
+    @Transactional
     public boolean tryMarkRunning(Long batchId, ClearingBatchContext batchContext) {
         Instant now = Instant.now();
 
@@ -91,10 +98,12 @@ public class ClearingBatchService {
         return clearingBatchRepository.saveAndFlush(retry);
     }
 
+    @Transactional
     public void markSuccess(Long batchID) {
         clearingBatchRepository.markSuccess(batchID, ClearingBatchStatus.SUCCESS, Instant.now());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(Long batchId, ClearingFailureCode failureCode, String detail) {
         String remark = formatRemark(failureCode, detail);
         clearingBatchRepository.markFailed(batchId, ClearingBatchStatus.FAILED, Instant.now(), remark);

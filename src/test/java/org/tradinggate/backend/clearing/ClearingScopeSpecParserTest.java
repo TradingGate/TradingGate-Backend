@@ -2,7 +2,7 @@ package org.tradinggate.backend.clearing;
 
 import org.junit.jupiter.api.Test;
 import org.tradinggate.backend.clearing.dto.ClearingScopeSpec;
-import org.tradinggate.backend.clearing.policy.ClearingScopeSpecParser;
+import org.tradinggate.backend.clearing.service.support.ClearingScopeSpecParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

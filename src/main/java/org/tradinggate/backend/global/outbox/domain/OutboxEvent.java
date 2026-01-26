@@ -145,7 +145,7 @@ public class OutboxEvent {
         this.lastError = null;
     }
 
-    public void markFailed(String error, int maxRetries) {
+    public void markPublishFailed(String error, int maxRetries) {
         this.retryCount += 1;
         this.lastError = truncate(error, 255);
         if (this.retryCount >= maxRetries) {

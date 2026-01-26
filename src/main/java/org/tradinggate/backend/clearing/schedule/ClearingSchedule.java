@@ -11,6 +11,7 @@ import org.tradinggate.backend.clearing.policy.ScheduledClearingBatchTriggerPoli
 import org.tradinggate.backend.clearing.service.ClearingOutboxRepairService;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Log4j2
 @Component
@@ -31,13 +32,13 @@ public class ClearingSchedule {
     // 예시: 10분마다 Intraday
     @Scheduled(cron = "0 */10 * * * *")
     public void runIntraday() {
-        clearingBatchRunner.run(LocalDate.now(), ClearingBatchType.INTRADAY, DEFAULT_SCOPE, scheduledPolicy);
+        clearingBatchRunner.run(LocalDate.now(ZoneId.of("Asia/Seoul")), ClearingBatchType.INTRADAY, DEFAULT_SCOPE, scheduledPolicy);
     }
 
     // 예시: 매일 18:00 EOD (시간은 니네 시장 기준으로 조정)
     @Scheduled(cron = "0 0 18 * * *")
     public void runEod() {
-        clearingBatchRunner.run(LocalDate.now(), ClearingBatchType.EOD, DEFAULT_SCOPE, scheduledPolicy);
+        clearingBatchRunner.run(LocalDate.now(ZoneId.of("Asia/Seoul")), ClearingBatchType.EOD, DEFAULT_SCOPE, scheduledPolicy);
     }
 
     @Scheduled(cron = "0 */5 * * * *") // 5분마다

@@ -9,6 +9,7 @@ import org.tradinggate.backend.clearing.policy.e.ProductType;
 import java.util.HashMap;
 import java.util.Map;
 
+
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "settlement.policy")

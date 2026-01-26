@@ -96,6 +96,10 @@ public class ClearingResult {
                 .realizedPnl(BigDecimal.ZERO)
                 .unrealizedPnl(BigDecimal.ZERO)
                 .fee(BigDecimal.ZERO)
+                .openingQty(BigDecimal.ZERO)
+                .closingQty(BigDecimal.ZERO)
+                .closingPrice(BigDecimal.ZERO)
+                .funding(BigDecimal.ZERO)
                 .build();
     }
 

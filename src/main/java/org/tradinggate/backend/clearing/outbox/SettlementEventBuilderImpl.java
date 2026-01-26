@@ -47,7 +47,7 @@ public class SettlementEventBuilderImpl implements SettlementEventBuilder {
         payload.put("key", String.valueOf(result.getAccountId()));
         payload.put("producer", "CLEARING");
         payload.put("eventType", EVENT_TYPE);
-        payload.put("occurredAt", Instant.now().toString());
+        payload.put("occurredAt", batch.getStartedAt().toString());
         payload.put("body", body);
 
         return payload;

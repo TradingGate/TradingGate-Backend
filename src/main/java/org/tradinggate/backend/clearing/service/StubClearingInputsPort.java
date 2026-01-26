@@ -4,14 +4,15 @@ import lombok.extern.log4j.Log4j2;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.tradinggate.backend.clearing.dto.ClearingComputationContext;
 import org.tradinggate.backend.clearing.dto.ClearingScopeSpec;
 import org.tradinggate.backend.clearing.service.port.ClearingInputsPort;
-import org.tradinggate.backend.clearing.policy.ClearingScopeSpecParser;
+import org.tradinggate.backend.clearing.service.support.ClearingScopeSpecParser;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,13 +26,11 @@ import java.util.stream.Collectors;
 @Profile("clearing")
 public class StubClearingInputsPort implements ClearingInputsPort {
 
-    private final ClearingScopeSpecParser scopeParser;
-
     @Override
-    public List<AccountSymbol> resolveUniverse(String scope) {
-        // TODO(B-5): 포지션/계정 레지스트리 기반으로 대상 확정하도록 교체
-        ClearingScopeSpec spec = scopeParser.parse(scope);
-        log.info("[CLEARING] universe resolved by stub. scope={} specType={}", scope, spec.type());
+    public List<AccountSymbol> resolveUniverse(ClearingComputationContext ctx) {
+        // 왜: scope 파싱은 ctx 생성 시 1회만 수행하는 게 목표지만, 혹시 ctx.scopeSpec이 null로 들어와도 안전하게 동작시킨다.
+        ClearingScopeSpec spec = Objects.requireNonNull(ctx.scopeSpec(), () -> "scopeSpec is null in ctx. batchId=" + ctx.batchId());
+        log.debug("[CLEARING] universe resolved by stub. scope={} specType={}", ctx.scopeRaw(), spec.type());
 
         List<AccountSymbol> base = List.of(
                 new AccountSymbol(1001L, 1L),
@@ -69,31 +68,50 @@ public class StubClearingInputsPort implements ClearingInputsPort {
     }
 
     @Override
-    public OpeningPosition loadOpening(LocalDate businessDate, Long accountId, Long symbolId) {
-        // TODO(B-5): 전일 EOD 결과/포지션 스냅샷 연동
-        log.info("[CLEARING] opening resolved by stub. date={} accountId={} symbolId={}", businessDate, accountId, symbolId);
+    public OpeningPosition loadOpening(ClearingComputationContext ctx, Long accountId, Long symbolId) {
+        LocalDate businessDate = ctx.businessDate();
+        log.debug("[CLEARING] opening resolved by stub. date={} accountId={} symbolId={}", businessDate, accountId, symbolId);
         return new OpeningPosition(BigDecimal.ZERO, null);
     }
 
     @Override
-    public TradeAgg aggregateTrades(LocalDate businessDate, Long accountId, Long symbolId, Map<String, Long> cutoffOffsets) {
-        // TODO(B-5): trading_trade 집계 + cutoff 기준 반영하도록 교체
-        log.info("[CLEARING] tradeAgg resolved by stub. date={} accountId={} symbolId={}", businessDate, accountId, symbolId);
-        return new TradeAgg(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+    public TradeAgg aggregateTrades(ClearingComputationContext ctx, Long accountId, Long symbolId) {
+        // cutoffOffsets는 정합성 기준점. stub에서도 null이면 사고이므로 fail-fast 한다.
+        if (ctx.cutoffOffsets() == null) {
+            throw new IllegalStateException("cutoffOffsets is null in ctx. batchId=" + ctx.batchId());
+        }
+        log.debug("[CLEARING] tradeAgg resolved by stub. date={} accountId={} symbolId={} cutoffKeys={}",
+                ctx.businessDate(), accountId, symbolId, ctx.cutoffOffsets().keySet());
+        long salt = ctx.cutoffOffsets().values().stream().mapToLong(Long::longValue).sum();
+        BigDecimal netQty = BigDecimal.valueOf(salt % 3); // 0~2 사이
+        return new TradeAgg(netQty, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
     @Override
-    public SymbolInfo loadSymbolInfo(Long symbolId) {
-        // TODO(B-5): symbol master 연동
-        log.info("[CLEARING] symbolInfo resolved by stub. symbolId={}", symbolId);
-        return new SymbolInfo(ProductType.SPOT);
+    public SymbolInfo loadSymbolInfo(ClearingComputationContext ctx, Long symbolId) {
+        log.debug("[CLEARING] symbolInfo resolved by stub. symbolId={}", symbolId);
+        return new SymbolInfo(symbolId == 2L ? ProductType.DERIVATIVE : ProductType.SPOT);
     }
 
     @Override
-    public PriceSnapshot loadPriceSnapshot(Long marketSnapshotId, Long symbolId) {
-        // TODO(B-5): market_data_snapshot 연동
-        log.info("[CLEARING] priceSnapshot resolved by stub. snapshotId={} symbolId={}", marketSnapshotId, symbolId);
-        BigDecimal p = BigDecimal.valueOf(100);
-        return new PriceSnapshot(p, p, p, p);
+    public PriceSnapshot loadPriceSnapshot(ClearingComputationContext ctx, Long symbolId) {
+        if (ctx.marketSnapshotId() == null) {
+            throw new IllegalStateException("marketSnapshotId is null in ctx. batchId=" + ctx.batchId());
+        }
+        log.debug("[CLEARING] priceSnapshot resolved by stub. snapshotId={} symbolId={}", ctx.marketSnapshotId(), symbolId);
+        if (symbolId == 2L) {
+            return new PriceSnapshot(
+                    BigDecimal.valueOf(101),
+                    BigDecimal.valueOf(102),
+                    BigDecimal.valueOf(103),
+                    BigDecimal.valueOf(104)
+            );
+        }
+        return new PriceSnapshot(
+                BigDecimal.valueOf(201),
+                BigDecimal.valueOf(202),
+                BigDecimal.valueOf(203),
+                BigDecimal.valueOf(204)
+        );
     }
 }
