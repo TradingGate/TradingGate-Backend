@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Getter
 @ToString
@@ -45,7 +46,7 @@ public class TradeExecutedEvent {
   private String liquidityFlag; // "MAKER" or "TAKER"
 
   @JsonProperty("execTime")
-  private String execTime;
+  private LocalDateTime execTime;
 
   // accountId와 symbolId는 symbol에서 파싱
   public Long getAccountId() {

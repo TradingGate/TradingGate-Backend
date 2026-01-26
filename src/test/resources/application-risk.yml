@@ -3,12 +3,13 @@ spring:
     activate:
       on-profile: risk
 
-  # [중요] 테스트는 PostgreSQL 대신 메모리 DB(H2)를 사용합니다.
+  # [중요] Testcontainers가 자동으로 PostgreSQL 설정을 주입합니다.
+  # @ServiceConnection 덕분에 datasource 설정을 명시하지 않아도 됩니다.
+  # 하지만 명시적으로 설정하려면 아래처럼 작성할 수 있습니다.
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    # Testcontainers가 자동으로 URL을 설정하므로 주석 처리
+    # url: jdbc:tc:postgresql:16-alpine:///testdb
+    driver-class-name: org.postgresql.Driver
 
   # JPA 설정: 테스트 시작 시 테이블을 생성(create)하고 끝나면 삭제(drop)합니다.
   jpa:
@@ -17,6 +18,8 @@ spring:
     properties:
       hibernate:
         format_sql: true # 실행되는 쿼리를 예쁘게 보여줍니다.
+        dialect: org.hibernate.dialect.PostgreSQLDialect  # PostgreSQL Dialect 명시
+        globally_quoted_identifiers: true  # 식별자를 따옴표로 감싸기
     show-sql: true
 
   # [중요] Redis 설정 (테스트용)
@@ -31,6 +34,9 @@ spring:
     consumer:
       group-id: test-risk-group
       auto-offset-reset: earliest
+    listener:
+      ack-mode: MANUAL
+      missing-topics-fatal: false
 
 tradinggate:
   role: risk
@@ -38,3 +44,11 @@ tradinggate:
     trades-executed: trades.executed
     risk-commands: risk.commands
     clearing-settlement: clearing.settlement
+
+# Testcontainers 관련 로깅
+logging:
+  level:
+    root: INFO
+    org.testcontainers: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE

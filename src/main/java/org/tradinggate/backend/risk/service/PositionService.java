@@ -87,18 +87,47 @@ public class PositionService {
 
   /**
    * 포지션 감소 (실현손익 계산)
+   * - 부분 청산: 기존 포지션의 일부만 청산
+   * - 전체 청산: 기존 포지션 전체 청산
+   * - 반대 포지션 진입: 전체 청산 후 남은 수량으로 반대 방향 포지션 시작
    */
   private BigDecimal decreasePosition(Position position, BigDecimal tradeQty, BigDecimal tradePrice) {
-    BigDecimal closeQty = tradeQty.abs().min(position.getQuantity().abs());
+    BigDecimal currentQty = position.getQuantity();
+    BigDecimal newQty = currentQty.add(tradeQty);
 
-    BigDecimal realizedPnl = pnlService.calculateRealizedPnl(
-        closeQty, position.getAvgPrice(), tradePrice, position.getQuantity().signum()
-    );
+    // 🔥 케이스 1: 전체 청산 후 반대 포지션 진입 (방향 전환)
+    if (currentQty.signum() != newQty.signum() && newQty.signum() != 0) {
+      // 1) 기존 포지션 전체 청산에 대한 실현손익 계산
+      BigDecimal closeQty = currentQty.abs();
+      BigDecimal realizedPnl = pnlService.calculateRealizedPnl(
+          closeQty, position.getAvgPrice(), tradePrice, currentQty.signum()
+      );
 
-    position.decreasePosition(tradeQty, realizedPnl);
-    log.debug("Position decreased: qty={}, realizedPnl={}", position.getQuantity(), realizedPnl);
+      // 2) 포지션 상태 업데이트 (수량 + 실현손익)
+      position.decreasePosition(tradeQty, realizedPnl);
 
-    return realizedPnl;
+      // 3) 🔥 핵심: 반대 포지션 진입 시 평단가를 새 진입가로 초기화
+      position.resetAvgPrice(tradePrice);
+
+      log.debug("Position reversed: closedQty={}, realizedPnl={}, newQty={}, newAvgPrice={}",
+          closeQty, realizedPnl, newQty, tradePrice);
+
+      return realizedPnl;
+    }
+
+    // 케이스 2: 부분 청산 또는 전체 청산 (방향 유지 또는 제로)
+    else {
+      BigDecimal closeQty = tradeQty.abs().min(currentQty.abs());
+
+      BigDecimal realizedPnl = pnlService.calculateRealizedPnl(
+          closeQty, position.getAvgPrice(), tradePrice, currentQty.signum()
+      );
+
+      position.decreasePosition(tradeQty, realizedPnl);
+      log.debug("Position decreased: qty={}, realizedPnl={}", position.getQuantity(), realizedPnl);
+
+      return realizedPnl;
+    }
   }
 
   /**

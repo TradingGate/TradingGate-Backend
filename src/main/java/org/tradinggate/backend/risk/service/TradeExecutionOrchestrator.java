@@ -61,8 +61,22 @@ public class TradeExecutionOrchestrator {
     accountBalanceService.updateBalance(event);
 
     // 5. Processed Trade 저장 (멱등성 보장)
-    processedTradeRepository.save(new ProcessedTrade(tradeId));
-    log.debug("ProcessedTrade saved: tradeId={}", tradeId);
+    ProcessedTrade processedTrade = new ProcessedTrade(
+        tradeId,
+        accountId,
+        symbolId,
+        symbol,
+        event.getSide(),
+        event.getExecQuantity(),
+        event.getExecPrice(),
+        event.getExecValue(),
+        event.getFeeAmount(),
+        event.getFeeCurrency(),
+        event.getExecTime()
+    );
+    processedTradeRepository.save(processedTrade);
+    log.debug("ProcessedTrade saved with full data: tradeId={}, accountId={}, symbol={}",
+        tradeId, accountId, symbol);
 
     // 6. Risk 체크 (B-2, B-3)
     riskManagementService.checkPositionLimit(accountId);

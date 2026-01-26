@@ -4,24 +4,27 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
+import org.tradinggate.backend.global.config.TestContainersConfig;
+import org.tradinggate.backend.risk.api.dto.PositionUpdateResult;
 import org.tradinggate.backend.risk.domain.entity.Position;
-import org.tradinggate.backend.risk.event.TradeExecutedEvent;
 import org.tradinggate.backend.risk.repository.PositionRepository;
-import org.tradinggate.backend.risk.repository.PnlIntradayRepository;
-import org.tradinggate.backend.risk.repository.ProcessedTradeRepository;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
+/**
+ * PositionService 단위 테스트
+ * - 포지션 계산 로직만 테스트 (단일 책임)
+ */
 @SpringBootTest
 @Transactional
+@Import(TestContainersConfig.class)
 @ActiveProfiles("risk")
 class PositionServiceTest {
 
@@ -31,23 +34,8 @@ class PositionServiceTest {
   @Autowired
   private PositionRepository positionRepository;
 
-  @Autowired
-  private PnlIntradayRepository pnlIntradayRepository;
-
   @MockitoBean
   private KafkaTemplate<String, Object> kafkaTemplate;
-
-  @MockitoBean
-  private ProcessedTradeRepository processedTradeRepository;
-
-  @MockitoBean
-  private AccountBalanceService accountBalanceService;
-
-  @MockitoBean
-  private SymbolService symbolService;
-
-  @MockitoBean
-  private RiskManagementService riskManagementService;
 
   @Test
   @DisplayName("1. 초기 진입: 롱 포지션이 새로 생성되어야 한다")
@@ -55,30 +43,20 @@ class PositionServiceTest {
     // Given
     Long accountId = 1L;
     Long symbolId = 100L;
-    Long tradeId = 1001L;
-
-    // Mock 설정: 중복 체크 통과
-    when(processedTradeRepository.existsByTradeId(tradeId)).thenReturn(false);
-    when(symbolService.getSymbolId("BTCUSDT")).thenReturn(symbolId);
-
-    TradeExecutedEvent event = new TradeExecutedEvent(
-        tradeId,
-        accountId,
-        "BTCUSDT",
-        "BUY",
-        new BigDecimal("1.0"),  // execQuantity
-        new BigDecimal("50000.0"),  // execPrice
-        new BigDecimal("50000.0"),  // execValue
-        new BigDecimal("10.0"),  // feeAmount
-        "USDT",  // feeCurrency
-        "TAKER",  // liquidityFlag
-        "2026-01-26T18:00:00Z"  // execTime
-    );
+    BigDecimal quantity = new BigDecimal("1.0");
+    BigDecimal price = new BigDecimal("50000.0");
 
     // When
-    positionService.processTradeExecution(event);
+    PositionUpdateResult result = positionService.updatePosition(
+        accountId, symbolId, quantity, price
+    );
 
     // Then
+    assertThat(result.getNewQuantity()).isEqualByComparingTo("1.0");
+    assertThat(result.getNewAvgPrice()).isEqualByComparingTo("50000.0");
+    assertThat(result.getRealizedPnl()).isEqualByComparingTo("0.0");
+
+    // DB 확인
     Position position = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
     assertThat(position.getQuantity()).isEqualByComparingTo("1.0");
     assertThat(position.getAvgPrice()).isEqualByComparingTo("50000.0");
@@ -87,35 +65,32 @@ class PositionServiceTest {
   @Test
   @DisplayName("2. 물타기: 평단가가 갱신되어야 한다 (5만 + 6만 = 5.5만)")
   void testAveragePriceUpdate() {
-    // Given (초기 포지션 셋팅)
+    // Given
     Long accountId = 2L;
     Long symbolId = 100L;
 
-    when(symbolService.getSymbolId("BTCUSDT")).thenReturn(symbolId);
-    when(processedTradeRepository.existsByTradeId(any())).thenReturn(false);
-
-    // 1차 진입
-    TradeExecutedEvent event1 = new TradeExecutedEvent(
-        2001L, accountId, "BTCUSDT", "BUY",
-        new BigDecimal("1.0"), new BigDecimal("50000.0"),
-        new BigDecimal("50000.0"), new BigDecimal("10.0"),
-        "USDT", "TAKER", "2026-01-26T18:00:00Z"
+    // 1차 진입: 1개 @ 50,000
+    positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("1.0"),
+        new BigDecimal("50000.0")
     );
-    positionService.processTradeExecution(event1);
 
-    // When (2차 진입 - 가격 상승)
-    TradeExecutedEvent event2 = new TradeExecutedEvent(
-        2002L, accountId, "BTCUSDT", "BUY",
-        new BigDecimal("1.0"), new BigDecimal("60000.0"),
-        new BigDecimal("60000.0"), new BigDecimal("10.0"),
-        "USDT", "TAKER", "2026-01-26T18:01:00Z"
+    // When: 2차 진입 - 1개 @ 60,000
+    PositionUpdateResult result = positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("1.0"),
+        new BigDecimal("60000.0")
     );
-    positionService.processTradeExecution(event2);
 
     // Then
-    Position position = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
+    // 수량: 2.0, 평단가: (50,000 + 60,000) / 2 = 55,000
+    assertThat(result.getNewQuantity()).isEqualByComparingTo("2.0");
+    assertThat(result.getNewAvgPrice()).isEqualByComparingTo("55000.0");
+    assertThat(result.getRealizedPnl()).isEqualByComparingTo("0.0"); // 포지션 증가는 실현손익 없음
 
-    // 수량 2.0, 평단가 55,000
+    // DB 확인
+    Position position = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
     assertThat(position.getQuantity()).isEqualByComparingTo("2.0");
     assertThat(position.getAvgPrice()).isEqualByComparingTo("55000.0");
   }
@@ -123,101 +98,122 @@ class PositionServiceTest {
   @Test
   @DisplayName("3. 부분 청산: 평단가는 유지되고, 실현손익이 발생해야 한다")
   void testPartialClose() {
-    // Given (2개, 평단 55,000 보유 상태 가정)
+    // Given: 2개 @ 평단 55,000 보유 상태 만들기
     Long accountId = 3L;
     Long symbolId = 100L;
 
-    when(symbolService.getSymbolId("BTCUSDT")).thenReturn(symbolId);
-    when(processedTradeRepository.existsByTradeId(any())).thenReturn(false);
-
-    // 초기 셋팅 (2개 직접 생성)
+    // 초기 포지션 생성 (2개 직접 삽입)
     Position position = Position.createDefault(accountId, symbolId);
     position.increasePosition(new BigDecimal("2.0"), new BigDecimal("55000.0"));
     positionRepository.save(position);
 
-    // When (1개 매도 @ 70,000불 - 익절)
-    TradeExecutedEvent event = new TradeExecutedEvent(
-        3001L, accountId, "BTCUSDT", "SELL",
-        new BigDecimal("1.0"), new BigDecimal("70000.0"),
-        new BigDecimal("70000.0"), new BigDecimal("10.0"),
-        "USDT", "TAKER", "2026-01-26T18:02:00Z"
+    // When: 1개 매도 @ 70,000 (SELL = 음수 수량)
+    PositionUpdateResult result = positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("-1.0"),  // SELL
+        new BigDecimal("70000.0")
     );
-    positionService.processTradeExecution(event);
 
     // Then
+    // 남은 수량: 1.0
+    assertThat(result.getNewQuantity()).isEqualByComparingTo("1.0");
+
+    // 평단가는 유지: 55,000
+    assertThat(result.getNewAvgPrice()).isEqualByComparingTo("55000.0");
+
+    // 실현손익: (70,000 - 55,000) * 1개 = 15,000
+    assertThat(result.getRealizedPnl()).isEqualByComparingTo("15000.0");
+
+    // DB 확인
     Position updatedPosition = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
-
-    // 남은 수량 1.0
     assertThat(updatedPosition.getQuantity()).isEqualByComparingTo("1.0");
-
-    // 평단가는 변하지 않음 (55,000 유지)
     assertThat(updatedPosition.getAvgPrice()).isEqualByComparingTo("55000.0");
-
-    // 실현손익: (70,000 - 55,000) * 1개 = 15,000 이득
     assertThat(updatedPosition.getRealizedPnl()).isEqualByComparingTo("15000.0");
   }
 
   @Test
-  @DisplayName("4. 멱등성 체크: 동일한 tradeId는 중복 처리되지 않아야 한다")
-  void testIdempotency() {
-    // Given
+  @DisplayName("4. 전체 청산 후 반대 포지션: 실현손익 정산 후 새 포지션 시작")
+  void testFullCloseAndReverse() {
+    // Given: 2개 롱 포지션 @ 50,000
     Long accountId = 4L;
     Long symbolId = 100L;
-    Long tradeId = 4001L;
 
-    when(symbolService.getSymbolId("BTCUSDT")).thenReturn(symbolId);
+    Position position = Position.createDefault(accountId, symbolId);
+    position.increasePosition(new BigDecimal("2.0"), new BigDecimal("50000.0"));
+    positionRepository.save(position);
 
-    // 첫 번째 호출: 처리 안됨
-    when(processedTradeRepository.existsByTradeId(tradeId)).thenReturn(false);
-
-    TradeExecutedEvent event = new TradeExecutedEvent(
-        tradeId, accountId, "BTCUSDT", "BUY",
-        new BigDecimal("1.0"), new BigDecimal("50000.0"),
-        new BigDecimal("50000.0"), new BigDecimal("10.0"),
-        "USDT", "TAKER", "2026-01-26T18:03:00Z"
+    // When: 3개 매도 @ 60,000 (2개 청산 + 1개 숏 진입)
+    PositionUpdateResult result = positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("-3.0"),
+        new BigDecimal("60000.0")
     );
 
-    // When: 첫 번째 처리
-    positionService.processTradeExecution(event);
+    // Then
+    // 남은 수량: -1.0 (숏 1개)
+    assertThat(result.getNewQuantity()).isEqualByComparingTo("-1.0");
 
-    Position position1 = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
-    assertThat(position1.getQuantity()).isEqualByComparingTo("1.0");
+    // 실현손익: (60,000 - 50,000) * 2개 = 20,000
+    assertThat(result.getRealizedPnl()).isEqualByComparingTo("20000.0");
 
-    // 두 번째 호출: 이미 처리됨
-    when(processedTradeRepository.existsByTradeId(tradeId)).thenReturn(true);
-
-    // When: 동일 tradeId로 재처리 시도 (리스너 레벨에서 걸러짐)
-    // 실제로는 RiskEventListener에서 return하므로 서비스까지 안 옴
-    // 하지만 테스트를 위해 서비스 호출 시 변화 없음을 확인
-
-    Position position2 = positionRepository.findByAccountIdAndSymbolId(accountId, symbolId).orElseThrow();
-
-    // Then: 수량이 변하지 않아야 함 (1.0 유지)
-    assertThat(position2.getQuantity()).isEqualByComparingTo("1.0");
+    // 새 평단가: 60,000
+    assertThat(result.getNewAvgPrice()).isEqualByComparingTo("60000.0");
   }
 
   @Test
-  @DisplayName("5. pnlintraday 저장 확인")
-  void testPnlIntradaySaved() {
+  @DisplayName("5. 숏 포지션 진입 및 청산")
+  void testShortPositionEntry() {
     // Given
     Long accountId = 5L;
     Long symbolId = 100L;
-    Long tradeId = 5001L;
 
-    when(symbolService.getSymbolId("BTCUSDT")).thenReturn(symbolId);
-    when(processedTradeRepository.existsByTradeId(tradeId)).thenReturn(false);
-
-    TradeExecutedEvent event = new TradeExecutedEvent(
-        tradeId, accountId, "BTCUSDT", "BUY",
-        new BigDecimal("1.0"), new BigDecimal("50000.0"),
-        new BigDecimal("50000.0"), new BigDecimal("15.0"),
-        "USDT", "TAKER", "2026-01-26T18:04:00Z"
+    // When: 숏 1개 진입 @ 50,000
+    PositionUpdateResult result1 = positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("-1.0"),  // SELL (숏)
+        new BigDecimal("50000.0")
     );
 
-    // When
-    positionService.processTradeExecution(event);
+    // Then
+    assertThat(result1.getNewQuantity()).isEqualByComparingTo("-1.0");
+    assertThat(result1.getNewAvgPrice()).isEqualByComparingTo("50000.0");
 
-    // Then: pnlintraday 레코드가 생성되어야 함
-    assertThat(pnlIntradayRepository.count()).isGreaterThan(0);
+    // When: 숏 청산 @ 48,000 (가격 하락 = 이익)
+    PositionUpdateResult result2 = positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("1.0"),  // BUY (숏 청산)
+        new BigDecimal("48000.0")
+    );
+
+    // Then
+    assertThat(result2.getNewQuantity()).isEqualByComparingTo("0.0");
+
+    // 숏 실현손익: (50,000 - 48,000) * 1개 = 2,000
+    assertThat(result2.getRealizedPnl()).isEqualByComparingTo("2000.0");
+  }
+
+  @Test
+  @DisplayName("6. 미실현 손익 계산")
+  void testUnrealizedPnl() {
+    // Given: 1개 롱 @ 50,000
+    Long accountId = 6L;
+    Long symbolId = 100L;
+
+    positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("1.0"),
+        new BigDecimal("50000.0")
+    );
+
+    // When: 가격이 55,000으로 상승
+    PositionUpdateResult result = positionService.updatePosition(
+        accountId, symbolId,
+        new BigDecimal("0.0"),  // 거래 없음 (가격 업데이트만)
+        new BigDecimal("55000.0")
+    );
+
+    // Then
+    // 미실현 손익: (55,000 - 50,000) * 1개 = 5,000
+    assertThat(result.getUnrealizedPnl()).isEqualByComparingTo("5000.0");
   }
 }
