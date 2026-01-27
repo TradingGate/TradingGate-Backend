@@ -18,7 +18,7 @@ public class RiskEventListener {
   private final ObjectMapper objectMapper;
 
   /**
-   * B-1: trades.executed 카프카 메시지 처리
+   * trades.executed 카프카 메시지 처리
    */
   @KafkaListener(
       topics = "trades.executed",

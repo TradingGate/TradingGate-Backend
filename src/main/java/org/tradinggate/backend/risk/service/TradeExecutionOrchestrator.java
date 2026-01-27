@@ -10,7 +10,7 @@ import org.tradinggate.backend.risk.event.TradeExecutedEvent;
 import org.tradinggate.backend.risk.repository.ProcessedTradeRepository;
 
 /**
- * B-1: trades.executed 처리의 오케스트레이터
+ * trades.executed 처리의 오케스트레이터
  * - 각 서비스를 순서대로 호출하여 트레이드 실행 플로우 조율
  * - 트랜잭션 경계 관리
  */
@@ -27,7 +27,7 @@ public class TradeExecutionOrchestrator {
   private final SymbolService symbolService;
 
   /**
-   * B-1: trades.executed 전체 플로우 실행
+   * trades.executed 전체 플로우 실행
    */
   @Transactional
   public void executeTradeFlow(TradeExecutedEvent event) {
@@ -49,7 +49,7 @@ public class TradeExecutionOrchestrator {
     log.info("Position updated: accountId={}, symbolId={}, qty={}, avgPrice={}, realizedPnl={}",
         accountId, symbolId, result.getNewQuantity(), result.getNewAvgPrice(), result.getRealizedPnl());
 
-    // 3. PnL Intraday 저장 (B-5 Clearing이 사용)
+    // 3. PnL Intraday 저장
     pnlIntradayService.savePnlIntraday(
         accountId, symbolId,
         result.getRealizedPnl(),
@@ -78,7 +78,7 @@ public class TradeExecutionOrchestrator {
     log.debug("ProcessedTrade saved with full data: tradeId={}, accountId={}, symbol={}",
         tradeId, accountId, symbol);
 
-    // 6. Risk 체크 (B-2, B-3)
+    // 6. Risk 체크
     riskManagementService.checkPositionLimit(accountId);
     riskManagementService.evaluateMargin(accountId);
 

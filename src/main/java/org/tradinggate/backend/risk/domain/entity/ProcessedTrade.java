@@ -9,8 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * B-1에서 처리한 trades.executed 원본 데이터 저장
- * - B-6 Reconciliation이 이 테이블을 기준으로 Kafka vs DB 비교
+ * trades.executed 원본 데이터 저장
  */
 @Entity
 @Getter
