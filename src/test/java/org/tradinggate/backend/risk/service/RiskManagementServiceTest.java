@@ -8,11 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
-import org.tradinggate.backend.risk.domain.entity.Position;
-import org.tradinggate.backend.risk.domain.entity.RiskStatus;
-import org.tradinggate.backend.risk.domain.entity.UserRiskProfile;
-import org.tradinggate.backend.risk.repository.PositionRepository;
-import org.tradinggate.backend.risk.repository.UserRiskProfileRepository;
+import org.tradinggate.backend.risk.domain.entity.risk.RiskStatus;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;

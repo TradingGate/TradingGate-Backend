@@ -171,7 +171,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   kafka:
     consumer:
-      group-id: risk-engine
+      group-id: risk
 
 server:
   port: 0
@@ -179,10 +179,39 @@ server:
 tradinggate:
   role: risk
   topics:
+    # 소비 토픽
     trades-executed: trades.executed
+    orders-updated: orders.updated
+
+    # 발행 토픽
     risk-commands: risk.commands
     clearing-settlement: clearing.settlement
 
+  # Risk 모듈 설정
+  risk:
+    # 잔고 부족 체크 활성화
+    balance-check:
+      enabled: true
+
+    # 계정 블락 활성화
+    account-block:
+      enabled: true
+
+    # 이상 감지 활성화 (옵션)
+    anomaly-detection:
+      enabled: false            # MVP에서는 false
+
+    # 대사 스케줄 (매일 01:00)
+    reconciliation:
+      enabled: true
+      cron: "0 0 1 * * *"       # 매일 새벽 1시
+
+# Logging
+logging:
+  level:
+    org.tradinggate.backend.risk: DEBUG
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: DEBUG
 
 # ============================================
 #  Profile: clearing

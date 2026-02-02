@@ -10,9 +10,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.config.TestContainersConfig;
-import org.tradinggate.backend.risk.api.dto.PositionUpdateResult;
-import org.tradinggate.backend.risk.domain.entity.Position;
-import org.tradinggate.backend.risk.repository.PositionRepository;
 
 import java.math.BigDecimal;
 
