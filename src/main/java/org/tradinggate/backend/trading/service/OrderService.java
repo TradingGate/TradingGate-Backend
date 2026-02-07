@@ -2,7 +2,6 @@ package org.tradinggate.backend.trading.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -17,11 +16,6 @@ import org.tradinggate.backend.trading.domain.entity.*;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
-import static org.tradinggate.backend.global.exception.UserErrorCode.DUPLICATE_REQUEST;
-
 @Slf4j
 @Service
 @Transactional
@@ -31,7 +25,7 @@ public class OrderService {
 
   private final OrderEventProducer orderEventProducer;
   private final OrderValidator orderValidator;
-  private final RiskCheckService riskCheckService;
+  private final OrderRiskValidationService riskCheckService;
   private final OrderRepository orderRepository;
   private final SourceType sourceType;
 

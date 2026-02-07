@@ -63,7 +63,7 @@ public class KafkaRiskConfig {
    * - enable-auto-commit: false (수동 커밋)
    */
   @Bean
-  public ConsumerFactory<String, String> riskConsumerFactory() {
+  public ConsumerFactory<String, String> consumerFactory() {
     log.info("Initializing Risk Consumer Factory: groupId={}, bootstrapServers={}",
         groupId, bootstrapServers);
 
@@ -110,12 +110,12 @@ public class KafkaRiskConfig {
    */
   @Bean
   public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-      ConsumerFactory<String, String> riskConsumerFactory) {
+      ConsumerFactory<String, String> consumerFactory) {
 
     log.info("Initializing Kafka Listener Container Factory for Risk Service");
 
     var factory = new ConcurrentKafkaListenerContainerFactory<String, String>();
-    factory.setConsumerFactory(riskConsumerFactory);
+    factory.setConsumerFactory(consumerFactory);
 
     // Manual Ack 설정
     factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
@@ -177,7 +177,7 @@ public class KafkaRiskConfig {
    * - max-in-flight: 1 (순서 보장)
    */
   @Bean
-  public ProducerFactory<String, String> riskProducerFactory() {
+  public ProducerFactory<String, String> producerFactory() {
     log.info("Initializing Risk Producer Factory: bootstrapServers={}", bootstrapServers);
 
     Map<String, Object> props = new HashMap<>();
@@ -218,10 +218,10 @@ public class KafkaRiskConfig {
    */
   @Bean
   public KafkaTemplate<String, String> kafkaTemplate(
-      ProducerFactory<String, String> riskProducerFactory) {
+      ProducerFactory<String, String> producerFactory) {
 
     log.info("Initializing Kafka Template for Risk Service");
 
-    return new KafkaTemplate<>(riskProducerFactory);
+    return new KafkaTemplate<>(producerFactory);
   }
 }

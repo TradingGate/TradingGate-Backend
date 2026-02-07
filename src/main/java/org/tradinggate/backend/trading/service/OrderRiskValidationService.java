@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 @RequiredArgsConstructor
 @Log4j2
-public class RiskCheckService {
+public class OrderRiskValidationService {
 
   private final StringRedisTemplate redisTemplate;
 

@@ -51,7 +51,7 @@ class OrderServiceIdempotencyTest {
   private RedissonClient redissonClient;
 
   @MockitoBean
-  private RiskCheckService riskCheckService;
+  private OrderRiskValidationService riskCheckService;
 
   @Mock
   private RLock rLock;

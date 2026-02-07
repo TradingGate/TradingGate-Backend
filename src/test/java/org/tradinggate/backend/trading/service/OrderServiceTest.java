@@ -32,7 +32,7 @@ class OrderServiceTest {
   private OrderEventProducer orderEventProducer;
 
   @Mock
-  private RiskCheckService riskCheckService;
+  private OrderRiskValidationService riskCheckService;
 
   @Mock
   private OrderValidator orderValidator;

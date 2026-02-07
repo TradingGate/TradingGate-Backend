@@ -181,11 +181,9 @@ tradinggate:
   topics:
     # 소비 토픽
     trades-executed: trades.executed
-    orders-updated: orders.updated
 
     # 발행 토픽
     risk-commands: risk.commands
-    clearing-settlement: clearing.settlement
 
   # Risk 모듈 설정
   risk:
@@ -197,14 +195,14 @@ tradinggate:
     account-block:
       enabled: true
 
-    # 이상 감지 활성화 (옵션)
+    # 이상 감지 활성화
     anomaly-detection:
-      enabled: false            # MVP에서는 false
+      enabled: false
 
     # 대사 스케줄 (매일 01:00)
     reconciliation:
       enabled: true
-      cron: "0 0 1 * * *"       # 매일 새벽 1시
+      cron: "0 0 1 * * *"
 
 # Logging
 logging:
