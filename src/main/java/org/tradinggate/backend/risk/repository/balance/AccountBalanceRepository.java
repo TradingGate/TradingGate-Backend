@@ -8,18 +8,12 @@ import java.util.Optional;
 
 public interface AccountBalanceRepository extends JpaRepository<AccountBalance, AccountBalanceId> {
 
-  /**
-   * 특정 계정의 특정 자산 잔고 조회
-   */
+  // 특정 계정의 특정 자산 잔고 조회
   Optional<AccountBalance> findByAccountIdAndAsset(Long accountId, String asset);
 
-  /**
-   * 특정 계정의 모든 자산 잔고 조회
-   */
+  // 특정 계정의 모든 자산 잔고 조회
   List<AccountBalance> findAllByAccountId(Long accountId);
 
-  /**
-   * 모든 잔고 조회 (대사용)
-   */
+  // 모든 잔고 조회 (대사용)
   List<AccountBalance> findAll();
 }

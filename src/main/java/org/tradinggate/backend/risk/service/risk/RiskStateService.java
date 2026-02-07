@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.annotation.Profile;
 import org.tradinggate.backend.risk.domain.entity.risk.RiskState;
 import org.tradinggate.backend.risk.domain.entity.risk.RiskStatus;
 import org.tradinggate.backend.risk.domain.event.BalanceInsufficientEvent;
@@ -23,6 +24,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
+@Profile("risk")
 @RequiredArgsConstructor
 public class RiskStateService {
 
@@ -37,7 +39,7 @@ public class RiskStateService {
   @EventListener
   @Transactional
   public void handleBalanceInsufficient(BalanceInsufficientEvent event) {
-    log.warn("🚨 Handling balance insufficient event: accountId={}, asset={}, balance={}",
+    log.warn("Handling balance insufficient event: accountId={}, asset={}, balance={}",
         event.getAccountId(), event.getAsset(), event.getCurrentBalance());
 
     blockAccount(event.getAccountId(), event.getReason());
@@ -54,20 +56,18 @@ public class RiskStateService {
         .findById(accountId)
         .orElseGet(() -> createNewRiskState(accountId));
 
-    // 이미 차단된 상태면 중복 처리 방지
     if (riskState.isBlocked()) {
-      log.debug("⚠️ Account already blocked: accountId={}", accountId);
+      log.debug("Account already blocked: accountId={}", accountId);
       return;
     }
 
-    // 차단 처리
     riskState.block(reason);
     riskStateRepository.save(riskState);
 
     // Kafka로 A 모듈에 알림
     riskCommandPublisher.publishBlockAccount(accountId, reason);
 
-    log.warn("🚫 Account BLOCKED: accountId={}, reason={}", accountId, reason);
+    log.warn("계정 차단: accountId={}, reason={}", accountId, reason);
   }
 
   /**
@@ -80,26 +80,23 @@ public class RiskStateService {
     Optional<RiskState> riskStateOpt = riskStateRepository.findById(accountId);
 
     if (riskStateOpt.isEmpty()) {
-      log.warn("⚠️ RiskState not found for unblock: accountId={}", accountId);
+      log.warn("⚠RiskState not found for unblock: accountId={}", accountId);
       return;
     }
 
     RiskState riskState = riskStateOpt.get();
 
-    // 이미 정상 상태면 중복 처리 방지
     if (riskState.isNormal()) {
-      log.debug("⚠️ Account already normal: accountId={}", accountId);
+      log.debug("⚠Account already normal: accountId={}", accountId);
       return;
     }
 
-    // 차단 해제
     riskState.unblock();
     riskStateRepository.save(riskState);
 
-    // Kafka로 A 모듈에 알림
     riskCommandPublisher.publishUnblockAccount(accountId);
 
-    log.info("✅ Account UNBLOCKED: accountId={}", accountId);
+    log.info("계정 차단 해제: accountId={}", accountId);
   }
 
   /**
@@ -117,7 +114,7 @@ public class RiskStateService {
   public boolean isBlocked(Long accountId) {
     return riskStateRepository.findById(accountId)
         .map(RiskState::isBlocked)
-        .orElse(false);  // RiskState 없으면 정상으로 간주
+        .orElse(false); // RiskState 없으면 정상으로 간주
   }
 
   /**

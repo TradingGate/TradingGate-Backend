@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 원장 조회 서비스
+ * 원장 조회 서비스 추후 개발?
  */
 @Service
 @RequiredArgsConstructor

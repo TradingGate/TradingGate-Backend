@@ -26,10 +26,6 @@ public class AccountBalance {
   @Builder.Default
   private BigDecimal available = BigDecimal.ZERO;
 
-  /**
-   * 잠금 잔고 (주문 중)
-   * MVP에서는 0으로 유지 가능
-   */
   @Column(nullable = false, precision = 20, scale = 8)
   @Builder.Default
   private BigDecimal locked = BigDecimal.ZERO;
@@ -45,10 +41,6 @@ public class AccountBalance {
 
   public void addAvailable(BigDecimal amount) {
     this.available = this.available.add(amount);
-  }
-
-  public void subtractAvailable(BigDecimal amount) {
-    this.available = this.available.subtract(amount);
   }
 
   public boolean isNegative() {

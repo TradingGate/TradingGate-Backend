@@ -149,8 +149,6 @@ public class AnomalyDetectionService {
         .build();
 
     anomalyLogRepository.save(logEntry);
-
-    // MVP: 로그만 기록, 블락은 하지 않음
   }
 
 
@@ -186,7 +184,5 @@ public class AnomalyDetectionService {
         .build();
 
     anomalyLogRepository.save(logEntry);
-
-    // MVP: 로그만 기록
   }
 }

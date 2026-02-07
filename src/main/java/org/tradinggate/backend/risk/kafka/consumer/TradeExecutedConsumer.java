@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
  */
 @Slf4j
 @Component
+@Profile("risk")
 @RequiredArgsConstructor
 public class TradeExecutedConsumer {
 
@@ -39,16 +41,12 @@ public class TradeExecutedConsumer {
   /**
    * trades.executed 토픽 리스너
    *
-   * @param message JSON 메시지
-   * @param partition 파티션 번호
-   * @param offset 오프셋
-   * @param ack Manual Commit용 Acknowledgment
+   * @param message
+   * @param partition
+   * @param offset
+   * @param ack
    */
-  @KafkaListener(
-      topics = "${tradinggate.topics.trades-executed:trades.executed}",
-      groupId = "${spring.kafka.consumer.group-id:risk-consumer-group}",
-      containerFactory = "kafkaListenerContainerFactory"
-  )
+  @KafkaListener(topics = "${tradinggate.topics.trades-executed:trades.executed}", groupId = "${spring.kafka.consumer.group-id:risk-consumer-group}", containerFactory = "kafkaListenerContainerFactory")
   public void consume(
       @Payload String message,
       @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,

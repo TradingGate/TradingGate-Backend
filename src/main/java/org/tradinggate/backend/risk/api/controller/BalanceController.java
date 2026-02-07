@@ -10,7 +10,6 @@ import java.util.List;
 /**
  * 잔고 조회 API
  */
-
 @RestController
 @RequestMapping("/api/risk/balance")
 @RequiredArgsConstructor

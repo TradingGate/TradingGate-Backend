@@ -3,6 +3,7 @@ package org.tradinggate.backend.risk.service.balance;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.risk.domain.entity.balance.AccountBalance;
 import org.tradinggate.backend.risk.repository.balance.AccountBalanceRepository;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 
 @Slf4j
 @Service
+@Profile("risk")
 @RequiredArgsConstructor
 public class BalanceService {
 
@@ -25,18 +27,14 @@ public class BalanceService {
     AccountBalance balance = balanceRepository
         .findByAccountIdAndAsset(accountId, asset)
         .orElseGet(() -> createNewBalance(accountId, asset));
-
     balance.addAvailable(amount);
-
     balanceRepository.save(balance);
-
     log.info("잔고 업데이트: accountId={}, asset={}, amount={}, new balance={}",
         accountId, asset, amount, balance.getAvailable());
   }
 
   /**
    * 여러 자산 잔고 동시 업데이트
-   *
    */
   @Transactional
   public void updateBalances(Long accountId, java.util.Map<String, BigDecimal> changes) {

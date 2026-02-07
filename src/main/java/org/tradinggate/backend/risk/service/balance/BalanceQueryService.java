@@ -19,9 +19,7 @@ public class BalanceQueryService {
 
   private final AccountBalanceRepository balanceRepository;
 
-  /**
-   * 특정 계정의 모든 자산 잔고 조회
-   */
+  // 계정 전체 자산 잔고 조회
   public List<BalanceResponse> getAccountBalance(Long accountId) {
     return balanceRepository.findAllByAccountId(accountId)
         .stream()
@@ -29,9 +27,7 @@ public class BalanceQueryService {
         .collect(Collectors.toList());
   }
 
-  /**
-   * 특정 계정의 특정 자산 잔고 조회
-   */
+  // 계정 특정 자산 잔고 조회
   public BalanceResponse getAssetBalance(Long accountId, String asset) {
     return balanceRepository.findByAccountIdAndAsset(accountId, asset)
         .map(BalanceResponse::from)

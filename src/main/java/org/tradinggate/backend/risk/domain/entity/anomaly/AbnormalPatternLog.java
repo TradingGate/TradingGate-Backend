@@ -11,11 +11,6 @@ import java.time.LocalDateTime;
  * - 이상 패턴 감지 시 자동 기록
  * - 로그 기반 모니터링 및 분석
  * - 일정 임계값 초과 시 계정 블락
- *
- * MVP 전략:
- * - 로그 우선 (모든 이상 패턴 기록)
- * - 제어 최소 (심각한 경우만 블락)
- * - 확장성 유지 (다양한 패턴 추가 가능)
  */
 @Entity
 @Table(name = "abnormal_pattern_log", indexes = {

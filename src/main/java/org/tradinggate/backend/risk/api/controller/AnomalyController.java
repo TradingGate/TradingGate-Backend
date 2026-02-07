@@ -22,29 +22,23 @@ public class AnomalyController {
   private final AnomalyDetectionService anomalyDetectionService;
   private final AnomalyLogService anomalyLogService;
 
-  // === 조회 API ===
-
   /**
    * 특정 계정의 최근 이상 로그 조회
-   * GET /api/risk/anomaly/account/{accountId}?hours=24
    */
   @GetMapping("/account/{accountId}")
   public ResponseEntity<List<AbnormalPatternResponse>> getAccountAnomalies(
       @PathVariable Long accountId,
       @RequestParam(defaultValue = "24") int hours) {
-
     List<AbnormalPatternResponse> logs = anomalyLogService
         .getRecentLogs(accountId, hours)
         .stream()
         .map(AbnormalPatternResponse::from)
         .collect(Collectors.toList());
-
     return ResponseEntity.ok(logs);
   }
 
   /**
    * 모든 미조치 이상 패턴 조회
-   * GET /api/risk/anomaly/unactioned
    */
   @GetMapping("/unactioned")
   public ResponseEntity<List<AbnormalPatternResponse>> getUnactionedAnomalies() {
@@ -53,30 +47,25 @@ public class AnomalyController {
         .stream()
         .map(AbnormalPatternResponse::from)
         .collect(Collectors.toList());
-
     return ResponseEntity.ok(logs);
   }
 
   /**
    * 특정 패턴의 미조치 로그 조회
-   * GET /api/risk/anomaly/unactioned/{patternType}
    */
   @GetMapping("/unactioned/{patternType}")
   public ResponseEntity<List<AbnormalPatternResponse>> getUnactionedByPattern(
       @PathVariable PatternType patternType) {
-
     List<AbnormalPatternResponse> logs = anomalyLogService
         .getUnactionedLogsByPattern(patternType)
         .stream()
         .map(AbnormalPatternResponse::from)
         .collect(Collectors.toList());
-
     return ResponseEntity.ok(logs);
   }
 
   /**
    * 특정 계정의 최근 1시간 주문 폭주 횟수
-   * GET /api/risk/anomaly/account/{accountId}/flood-count
    */
   @GetMapping("/account/{accountId}/flood-count")
   public ResponseEntity<Long> getOrderFloodCount(@PathVariable Long accountId) {
@@ -88,7 +77,6 @@ public class AnomalyController {
 
   /**
    * 주문 폭주 감지 트리거 (수동 실행)
-   * POST /api/risk/anomaly/detect/order-flood
    */
   @PostMapping("/detect/order-flood")
   public ResponseEntity<Void> detectOrderFlood(
@@ -101,7 +89,6 @@ public class AnomalyController {
 
   /**
    * 심볼별 주문 폭주 감지 트리거
-   * POST /api/risk/anomaly/detect/order-flood-symbol
    */
   @PostMapping("/detect/order-flood-symbol")
   public ResponseEntity<Void> detectOrderFloodBySymbol(
@@ -115,7 +102,6 @@ public class AnomalyController {
 
   /**
    * 취소 반복 감지 트리거
-   * POST /api/risk/anomaly/detect/cancel-repeat
    */
   @PostMapping("/detect/cancel-repeat")
   public ResponseEntity<Void> detectCancelRepeat(
@@ -129,7 +115,6 @@ public class AnomalyController {
 
   /**
    * 대량 주문 감지 트리거
-   * POST /api/risk/anomaly/detect/large-order
    */
   @PostMapping("/detect/large-order")
   public ResponseEntity<Void> detectLargeOrder(

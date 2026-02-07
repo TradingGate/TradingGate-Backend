@@ -9,16 +9,6 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
-/**
- * Risk Command 발행자
- *
- * 역할:
- * - A 모듈(Matching Engine)로 제어 명령 전송
- * - 계정 블락/해제 명령
- *
- * 토픽:
- * - risk.commands
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,9 +20,7 @@ public class RiskCommandPublisher {
   @Value("${tradinggate.topics.risk-commands:risk.commands}")
   private String riskCommandsTopic;
 
-  /**
-   * 계정 차단 명령 발행
-   */
+  // 계정 차단 명령 발행
   public void publishBlockAccount(Long accountId, String reason) {
     RiskCommand command = RiskCommand.builder()
         .commandType("BLOCK_ACCOUNT")
@@ -44,9 +32,7 @@ public class RiskCommandPublisher {
     sendCommand(command);
   }
 
-  /**
-   * 계정 차단 해제 명령 발행
-   */
+  // 계정 차단 해제 명령 발행
   public void publishUnblockAccount(Long accountId) {
     RiskCommand command = RiskCommand.builder()
         .commandType("UNBLOCK_ACCOUNT")
@@ -57,9 +43,7 @@ public class RiskCommandPublisher {
     sendCommand(command);
   }
 
-  /**
-   * Kafka로 명령 전송
-   */
+  // Kafka로 명령 전송
   private void sendCommand(RiskCommand command) {
     try {
       String message = objectMapper.writeValueAsString(command);
@@ -67,28 +51,24 @@ public class RiskCommandPublisher {
       kafkaTemplate.send(
           riskCommandsTopic,
           command.getAccountId().toString(),
-          message
-      );
+          message);
 
-      log.info("📤 Risk command sent: type={}, accountId={}",
+      log.info("Risk command sent: type={}, accountId={}",
           command.getCommandType(), command.getAccountId());
 
     } catch (JsonProcessingException e) {
-      log.error("❌ Failed to serialize risk command: {}", command, e);
+      log.error("Failed to serialize risk command: {}", command, e);
       throw new RuntimeException("Failed to publish risk command", e);
     }
   }
 }
 
-/**
- * Risk Command DTO
- */
 @lombok.Data
 @lombok.Builder
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
 class RiskCommand {
-  private String commandType;  // BLOCK_ACCOUNT, UNBLOCK_ACCOUNT
+  private String commandType; // BLOCK_ACCOUNT, UNBLOCK_ACCOUNT
   private Long accountId;
   private String reason;
   private LocalDateTime timestamp;
