@@ -18,8 +18,7 @@ public interface AbnormalPatternLogRepository extends JpaRepository<AbnormalPatt
    */
   List<AbnormalPatternLog> findByAccountIdAndDetectedAtAfter(
       Long accountId,
-      LocalDateTime after
-  );
+      LocalDateTime after);
 
   /**
    * 특정 패턴의 미조치 로그 조회
@@ -36,33 +35,44 @@ public interface AbnormalPatternLogRepository extends JpaRepository<AbnormalPatt
    * 예: 최근 1시간 ORDER_FLOOD 횟수
    */
   @Query("""
-        SELECT COUNT(a)
-        FROM AbnormalPatternLog a
-        WHERE a.accountId = :accountId
-          AND a.patternType = :patternType
-          AND a.detectedAt >= :since
-    """)
+          SELECT COUNT(a)
+          FROM AbnormalPatternLog a
+          WHERE a.accountId = :accountId
+            AND a.patternType = :patternType
+            AND a.detectedAt >= :since
+      """)
   long countByAccountIdAndPatternTypeSince(
       @Param("accountId") Long accountId,
       @Param("patternType") PatternType patternType,
-      @Param("since") LocalDateTime since
-  );
+      @Param("since") LocalDateTime since);
 
   /**
    * 특정 계정의 특정 심볼, 특정 시간 이후 특정 패턴 카운트
    */
   @Query("""
-        SELECT COUNT(a)
-        FROM AbnormalPatternLog a
-        WHERE a.accountId = :accountId
-          AND a.symbol = :symbol
-          AND a.patternType = :patternType
-          AND a.detectedAt >= :since
-    """)
+          SELECT COUNT(a)
+          FROM AbnormalPatternLog a
+          WHERE a.accountId = :accountId
+            AND a.symbol = :symbol
+            AND a.patternType = :patternType
+            AND a.detectedAt >= :since
+      """)
   long countByAccountIdAndSymbolAndPatternTypeSince(
       @Param("accountId") Long accountId,
       @Param("symbol") String symbol,
       @Param("patternType") PatternType patternType,
-      @Param("since") LocalDateTime since
-  );
+      @Param("since") LocalDateTime since);
+
+  /**
+   * 특정 계정 + 패턴 타입별 조회 (시간 역순)
+   */
+  List<AbnormalPatternLog> findByAccountIdAndPatternTypeOrderByDetectedAtDesc(
+      Long accountId,
+      PatternType patternType);
+
+  /**
+   * 특정 계정 + 패턴 타입 카운트
+   */
+  long countByAccountIdAndPatternType(Long accountId, PatternType patternType);
+
 }

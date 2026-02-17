@@ -53,8 +53,8 @@ public class TradeExecutedConsumer {
       @Header(KafkaHeaders.OFFSET) long offset,
       Acknowledgment ack) {
 
-    log.info("📨 Kafka message received: partition={}, offset={}", partition, offset);
-    log.debug("📨 Message: {}", message);
+    log.info("Kafka message received: partition={}, offset={}", partition, offset);
+    log.debug("Message: {}", message);
 
     try {
       // JSON → TradeExecutedEvent 변환
@@ -83,30 +83,18 @@ public class TradeExecutedConsumer {
           partition, offset, e.getMessage());
       log.error("❌ Invalid message: {}", message);
 
-      // TODO: DLQ로 전송
-      // dlqProducer.send("trades.executed.dlq", message);
-
-      // 파싱 불가능한 메시지는 Commit (재시도 불필요)
       ack.acknowledge();
 
     } catch (IllegalArgumentException e) {
-      // 검증 에러 → DLQ 전송 후 Commit
       log.error("❌ Validation error: partition={}, offset={}, error={}",
           partition, offset, e.getMessage());
 
-      // TODO: DLQ로 전송
-      // dlqProducer.send("trades.executed.dlq", message);
-
-      // 검증 실패는 Commit (재시도 불필요)
       ack.acknowledge();
 
     } catch (Exception e) {
-      // 비즈니스 로직 에러 → 재시도 (Commit 안 함)
       log.error("❌ Business logic error: partition={}, offset={}, error={}",
           partition, offset, e.getMessage(), e);
 
-      // Commit하지 않음 → 다음 poll에서 재시도
-      // 재시도 횟수 제한은 Kafka Consumer Config에서 설정
     }
   }
 

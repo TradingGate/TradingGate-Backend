@@ -28,49 +28,26 @@ public class AbnormalPatternLog {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /**
-   * 계정 ID
-   */
   @Column(nullable = false)
   private Long accountId;
 
-  /**
-   * 심볼 (선택, 심볼별 감지 시)
-   */
   @Column(length = 20)
   private String symbol;
 
-  /**
-   * 패턴 타입
-   */
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 30)
   private PatternType patternType;
 
-  /**
-   * 상세 설명
-   * 예: "Order flood: 150 orders in 1 minute"
-   */
   @Column(length = 500)
   private String description;
 
-  /**
-   * 조치 여부
-   */
   @Column(nullable = false)
   @Builder.Default
   private Boolean actionTaken = false;
 
-  /**
-   * 조치 내용
-   * 예: "Account blocked", "Warning sent"
-   */
   @Column(length = 200)
   private String action;
 
-  /**
-   * 감지 시각
-   */
   @Column(nullable = false)
   private LocalDateTime detectedAt;
 
@@ -81,11 +58,12 @@ public class AbnormalPatternLog {
     }
   }
 
-  /**
-   * 조치 완료 표시
-   */
   public void markActionTaken(String action) {
     this.actionTaken = true;
     this.action = action;
+  }
+
+  public boolean isActionTaken() {
+    return Boolean.TRUE.equals(this.actionTaken);
   }
 }

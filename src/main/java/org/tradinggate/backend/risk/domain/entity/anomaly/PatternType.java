@@ -12,8 +12,8 @@ package org.tradinggate.backend.risk.domain.entity.anomaly;
  * - LARGE_ORDER: 비정상적 대량 주문
  */
 public enum PatternType {
-  ORDER_FLOOD,          // 주문 폭주 (MVP 핵심)
-  CANCEL_REPEAT,        // 취소 반복 (선택)
-  PRICE_MANIPULATION,   // 가격 조작 (선택)
-  LARGE_ORDER          // 대량 주문 (선택)
+  ORDER_FLOOD,
+  CANCEL_REPEAT,
+  PRICE_MANIPULATION,
+  LARGE_ORDER
 }

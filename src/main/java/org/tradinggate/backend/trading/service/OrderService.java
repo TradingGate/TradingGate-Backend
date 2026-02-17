@@ -30,11 +30,9 @@ public class OrderService {
   private final SourceType sourceType;
 
   /** 신규 주문 생성 */
-  @RedissonLock(
-      key =  "'order:' + #request.clientOrderId", // 임시"'order:idempotency:' + #userId + ':' + #request.clientOrderId",
-      waitTime = 0L,
-      leaseTime = 30L
-  )
+  @RedissonLock(key = "'order:' + #request.clientOrderId", // 임시"'order:idempotency:' + #userId + ':' +
+                                                           // #request.clientOrderId",
+      waitTime = 0L, leaseTime = 30L)
   public OrderCreateResponse createOrder(OrderCreateRequest request, Long userId) {
     log.info("Creating order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
 
@@ -63,10 +61,8 @@ public class OrderService {
         request.getQuantity());
 
     try {
-      // [중요] DB 저장 시도
       orderRepository.save(order);
     } catch (DataIntegrityViolationException e) {
-      // [핵심 수정] DB 레벨에서 중복 키 충돌 발생 시 예외 변환
       log.error("Duplicate order detected (DB Constraint): userId={}, clientOrderId={}",
           userId, request.getClientOrderId());
       throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);

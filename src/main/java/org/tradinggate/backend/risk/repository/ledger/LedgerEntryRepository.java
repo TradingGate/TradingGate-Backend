@@ -24,34 +24,38 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> 
   List<LedgerEntry> findByTradeId(String tradeId);
 
   /**
-   * 특정 계정의 특정 자산 원장 조회
+   * 특정 계정의 특정 자산 원장 조회 (시간 역순)
    */
   List<LedgerEntry> findByAccountIdAndAssetOrderByCreatedAtDesc(Long accountId, String asset);
+
+  /**
+   * 특정 계정의 모든 원장 조회 (시간 순)
+   */
+  List<LedgerEntry> findByAccountIdOrderByCreatedAtAsc(Long accountId);
 
   /**
    * 특정 시점까지의 원장 합계 (대사용)
    */
   @Query("""
-        SELECT COALESCE(SUM(l.amount), 0)
-        FROM LedgerEntry l
-        WHERE l.accountId = :accountId
-          AND l.asset = :asset
-          AND l.createdAt <= :endDateTime
-    """)
+          SELECT COALESCE(SUM(l.amount), 0)
+          FROM LedgerEntry l
+          WHERE l.accountId = :accountId
+            AND l.asset = :asset
+            AND l.createdAt <= :endDateTime
+      """)
   BigDecimal sumByAccountIdAndAssetUpToDate(
       @Param("accountId") Long accountId,
       @Param("asset") String asset,
-      @Param("endDateTime") LocalDateTime endDateTime
-  );
+      @Param("endDateTime") LocalDateTime endDateTime);
 
   /**
    * 특정 계정의 모든 자산 원장 합계 (현재 잔고 계산용)
    */
   @Query("""
-        SELECT l.asset, COALESCE(SUM(l.amount), 0)
-        FROM LedgerEntry l
-        WHERE l.accountId = :accountId
-        GROUP BY l.asset
-    """)
+          SELECT l.asset, COALESCE(SUM(l.amount), 0)
+          FROM LedgerEntry l
+          WHERE l.accountId = :accountId
+          GROUP BY l.asset
+      """)
   List<Object[]> sumAllAssetsByAccountId(@Param("accountId") Long accountId);
 }

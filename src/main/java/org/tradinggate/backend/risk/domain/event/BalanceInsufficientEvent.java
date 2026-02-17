@@ -30,11 +30,8 @@ public class BalanceInsufficientEvent {
   private String reason;
   private LocalDateTime occurredAt;
 
-  /**
-   * 팩토리 메서드
-   */
   public static BalanceInsufficientEvent of(Long accountId, String asset,
-                                            BigDecimal balance, String reason) {
+      BigDecimal balance, String reason) {
     return BalanceInsufficientEvent.builder()
         .accountId(accountId)
         .asset(asset)
