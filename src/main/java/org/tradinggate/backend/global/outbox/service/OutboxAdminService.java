@@ -1,6 +1,7 @@
 package org.tradinggate.backend.global.outbox.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Profile({"clearing", "risk"})
 public class OutboxAdminService {
 
     private final OutboxEventRepository outboxEventRepository;

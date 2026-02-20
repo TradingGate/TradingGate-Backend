@@ -20,6 +20,7 @@ import org.tradinggate.backend.matching.engine.model.OrderCommand;
 @Service
 @Profile("worker")
 @RequiredArgsConstructor
+@Profile("worker")
 public class MatchingWorkerService {
 
     private final MatchingEngine matchingEngine;

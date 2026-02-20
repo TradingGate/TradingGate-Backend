@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Getter
 @Profile("worker")
 @RequiredArgsConstructor(access = AccessLevel.PUBLIC)
+@Profile("worker")
 public class MatchingEngineImpl implements MatchingEngine {
 
     private final OrderBookRegistry orderBookRegistry;

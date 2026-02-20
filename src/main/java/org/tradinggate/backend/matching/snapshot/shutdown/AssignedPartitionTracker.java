@@ -1,6 +1,7 @@
 package org.tradinggate.backend.matching.snapshot.shutdown;
 
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - snapshot()은 방어적 복사본을 반환하여 외부에서 상태를 오염시키지 못하게 한다.
  */
 @Component
+@Profile("worker")
 public class AssignedPartitionTracker {
 
     private final Set<TopicPartition> assigned = ConcurrentHashMap.newKeySet();

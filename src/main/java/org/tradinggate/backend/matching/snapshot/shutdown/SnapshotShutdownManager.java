@@ -25,6 +25,7 @@ import org.tradinggate.backend.matching.snapshot.writer.SnapshotWriteQueue;
 @Component
 @Profile("worker")
 @RequiredArgsConstructor
+@Profile("worker")
 public class SnapshotShutdownManager {
 
     private final SnapshotWriteQueue snapshotWriteQueue;

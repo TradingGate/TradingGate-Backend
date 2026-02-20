@@ -2,6 +2,7 @@ package org.tradinggate.backend.global.outbox.infrastructure;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.global.outbox.domain.OutboxStatus;
@@ -11,6 +12,7 @@ import java.time.Duration;
 @Log4j2
 @Component
 @RequiredArgsConstructor
+@Profile({"clearing", "risk"})
 public class OutboxMonitor {
 
     private final OutboxEventRepository outboxEventRepository;

@@ -1,9 +1,12 @@
 package org.tradinggate.backend.global.outbox.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.tradinggate.backend.global.outbox.domain.OutboxStatus;
 import org.tradinggate.backend.global.outbox.infrastructure.OutboxEventRepository;
 import org.tradinggate.backend.global.outbox.domain.OutboxEvent;
 import org.tradinggate.backend.global.outbox.domain.OutboxProducerType;
@@ -12,11 +15,13 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Profile({"clearing", "risk"})
 public class OutboxAppender {
 
     private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
+    @Transactional
     public void append(
             OutboxProducerType producerType,
             String eventType,
@@ -25,19 +30,22 @@ public class OutboxAppender {
             String idempotencyKey,
             Map<String, Object> payload
     ) {
-        OutboxEvent event = OutboxEvent.pending(
-                producerType,
+        // 중복은 정상(멱등)이고, 예외 기반이면 rollback-only 문제가 생길 수 있다.
+        final String payloadJson;
+        try {
+            payloadJson = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new IllegalStateException("payload serialization failed. idemKey=" + idempotencyKey, e);
+        }
+
+        outboxEventRepository.insertIgnoreConflict(
+                producerType.name(),
                 eventType,
                 aggregateType,
                 aggregateId,
                 idempotencyKey,
-                payload
+                payloadJson,
+                OutboxStatus.PENDING.name()
         );
-
-        try {
-            outboxEventRepository.save(event);
-        } catch (DataIntegrityViolationException dup) {
-            // idempotency_key UNIQUE 충돌 => 이미 적재된 이벤트로 간주하고 무시(멱등)
-        }
     }
 }

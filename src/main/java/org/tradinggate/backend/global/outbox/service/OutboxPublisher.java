@@ -2,6 +2,7 @@ package org.tradinggate.backend.global.outbox.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.outbox.infrastructure.KafkaOutboxMessageSender;
@@ -14,6 +15,7 @@ import java.util.List;
 @Log4j2
 @Service
 @RequiredArgsConstructor
+@Profile({"clearing", "risk"})
 public class OutboxPublisher {
 
     private final OutboxEventRepository outboxEventRepository;
@@ -30,7 +32,7 @@ public class OutboxPublisher {
         int batchSize = outboxProperties.getBatchSize();
         int maxRetries = outboxProperties.getMaxRetries();
 
-        List<OutboxEvent> events = outboxEventRepository.lockAndLoadPending(batchSize);
+        List<OutboxEvent> events = outboxEventRepository.lockAndLoadPending(batchSize, outboxProperties.getMaxRetries());
         if (events.isEmpty()) {
             return 0;
         }
@@ -46,7 +48,7 @@ public class OutboxPublisher {
                 log.warn("[OUTBOX] publish failed. id={}, type={}, idemKey={}, err={}",
                         event.getId(), event.getEventType(), event.getIdempotencyKey(), err);
 
-                event.markFailed(err, maxRetries);
+                event.markPublishFailed(err, maxRetries);
             }
         }
         return success;

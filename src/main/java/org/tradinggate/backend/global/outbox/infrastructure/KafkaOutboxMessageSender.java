@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.global.outbox.domain.OutboxEvent;
 import org.tradinggate.backend.global.kafka.producer.KafkaMessageProducer;
+import org.tradinggate.backend.global.outbox.domain.OutboxProducerType;
 
 import java.util.Map;
 
@@ -14,21 +15,21 @@ public class KafkaOutboxMessageSender {
 
     private final KafkaMessageProducer kafkaMessageProducer;
     private final ObjectMapper objectMapper;
+    private final OutboxProperties outboxProperties;
 
     public void send(OutboxEvent event) throws Exception {
-        Map<String, Object> payload = event.getPayload();
+        OutboxProducerType producerType = event.getProducerType();
+        String eventType = event.getEventType();
 
-        Object topicObj = payload.get("topic");
-        Object keyObj = payload.get("key");
-
-        if (!(topicObj instanceof String topic) || topic.isBlank()) {
-            throw new IllegalArgumentException("Outbox payload must include non-empty 'topic'. eventId=" + event.getId());
-        }
-        if (!(keyObj instanceof String key) || key.isBlank()) {
-            throw new IllegalArgumentException("Outbox payload must include non-empty 'key'. eventId=" + event.getId());
+        String topic = outboxProperties.resolveTopic(producerType, eventType);
+        if (topic == null || topic.isBlank()) {
+            throw new IllegalStateException("Outbox topic mapping not found. producerType=" + producerType
+                    + ", eventType=" + eventType + ", eventId=" + event.getId());
         }
 
-        String json = objectMapper.writeValueAsString(payload);
+        String key = event.getIdempotencyKey();
+
+        String json = objectMapper.writeValueAsString(event.getPayload());
         kafkaMessageProducer.sendAndWait(topic, key, json);
     }
 }

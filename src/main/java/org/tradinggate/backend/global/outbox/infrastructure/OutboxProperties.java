@@ -3,6 +3,10 @@ package org.tradinggate.backend.global.outbox.infrastructure;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.tradinggate.backend.global.outbox.domain.OutboxProducerType;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -23,4 +27,12 @@ public class OutboxProperties {
      * 스케줄 폴링 주기(ms)
      */
     private long pollIntervalMs = 200;
+
+    private Map<String, Map<String, String>> topics = new HashMap<>();
+
+    public String resolveTopic(OutboxProducerType producerType, String eventType) {
+        Map<String, String> byProducer = topics.get(producerType);
+        if (byProducer == null) return null;
+        return byProducer.get(eventType);
+    }
 }

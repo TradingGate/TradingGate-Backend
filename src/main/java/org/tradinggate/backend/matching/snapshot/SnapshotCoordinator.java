@@ -37,6 +37,7 @@ import org.tradinggate.backend.matching.snapshot.writer.SnapshotWriteQueue;
 @Component
 @Profile("worker")
 @RequiredArgsConstructor
+@Profile("worker")
 public class SnapshotCoordinator {
 
     private final OrderBookRegistry orderBookRegistry;

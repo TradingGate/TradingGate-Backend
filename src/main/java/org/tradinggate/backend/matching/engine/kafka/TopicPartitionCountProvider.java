@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 @Profile("worker")
 @RequiredArgsConstructor
+@Profile("worker")
 public class TopicPartitionCountProvider implements PartitionCountProvider{
 
     private final AdminClient adminClient;
