@@ -1,7 +1,7 @@
 spring:
   # Redisson 비활성화
   redisson:
-    enabled: false  # ✅ Redisson 완전 비활성화
+    enabled: false
 
   # Redis 비활성화
   data:

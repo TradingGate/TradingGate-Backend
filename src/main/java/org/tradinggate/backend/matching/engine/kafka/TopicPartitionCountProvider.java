@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 @Log4j2
 @Component
+@Profile("worker")
 @RequiredArgsConstructor
 @Profile("worker")
 public class TopicPartitionCountProvider implements PartitionCountProvider{

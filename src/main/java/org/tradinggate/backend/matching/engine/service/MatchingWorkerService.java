@@ -18,6 +18,7 @@ import org.tradinggate.backend.matching.engine.model.OrderCommand;
  *   엔진(또는 소비/발행 프로토콜)에서 멱등성 기준을 반드시 유지해야 한다.
  */
 @Service
+@Profile("worker")
 @RequiredArgsConstructor
 @Profile("worker")
 public class MatchingWorkerService {

@@ -171,7 +171,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   kafka:
     consumer:
-      group-id: risk-engine
+      group-id: risk
 
 server:
   port: 0
@@ -179,10 +179,37 @@ server:
 tradinggate:
   role: risk
   topics:
+    # 소비 토픽
     trades-executed: trades.executed
-    risk-commands: risk.commands
-    clearing-settlement: clearing.settlement
 
+    # 발행 토픽
+    risk-commands: risk.commands
+
+  # Risk 모듈 설정
+  risk:
+    # 잔고 부족 체크 활성화
+    balance-check:
+      enabled: true
+
+    # 계정 블락 활성화
+    account-block:
+      enabled: true
+
+    # 이상 감지 활성화
+    anomaly-detection:
+      enabled: false
+
+    # 대사 스케줄 (매일 01:00)
+    reconciliation:
+      enabled: true
+      cron: "0 0 1 * * *"
+
+# Logging
+logging:
+  level:
+    org.tradinggate.backend.risk: DEBUG
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: DEBUG
 
 # ============================================
 #  Profile: clearing
@@ -246,30 +273,3 @@ tradinggate:
   topics:
     trades-executed: trades.executed
     orders-updated: orders.updated
-
-# ============================================
-#  Profile: test
-# ============================================
----
-spring:
-  config:
-    activate:
-      on-profile: test
-
-  datasource:
-    # 아래 url 라인을 수정하세요. (INIT 부분 추가)
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS "jsonb" AS json
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  # Hibernate가 H2 Dialect를 사용하도록 명시 (선택사항이지만 권장)
-  jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-
-  kafka:
-    consumer:
-      group-id: test-group

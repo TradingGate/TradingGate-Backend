@@ -2,7 +2,6 @@ package org.tradinggate.backend.trading.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.tradinggate.backend.global.exception.CustomException;
@@ -21,8 +20,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 @RequiredArgsConstructor
 @Log4j2
-@Profile("api")
-public class RiskCheckService {
+public class OrderRiskValidationService {
 
   private final StringRedisTemplate redisTemplate;
 

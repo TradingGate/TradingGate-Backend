@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 @Getter
+@Profile("worker")
 @RequiredArgsConstructor(access = AccessLevel.PUBLIC)
 @Profile("worker")
 public class MatchingEngineImpl implements MatchingEngine {

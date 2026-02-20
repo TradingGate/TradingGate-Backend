@@ -81,10 +81,10 @@ public class Order {
   @Column(name = "reject_reason", length = 128)
   private String rejectReason;
 
-  @Column(name = "create_at")
+  @Column(name = "created_at")
   private LocalDateTime createdAt;
 
-  @Column(name = "update_at")
+  @Column(name = "updated_at")
   private LocalDateTime updatedAt;
 
   @Column(name = "last_event_seq")

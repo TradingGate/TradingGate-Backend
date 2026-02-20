@@ -2,8 +2,8 @@ package org.tradinggate.backend.trading.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.global.aop.redisson.RedissonLock;
@@ -16,11 +16,6 @@ import org.tradinggate.backend.trading.domain.entity.*;
 import org.tradinggate.backend.trading.domain.repository.OrderRepository;
 import org.tradinggate.backend.trading.kafka.producer.OrderEventProducer;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
-import static org.tradinggate.backend.global.exception.UserErrorCode.DUPLICATE_REQUEST;
-
 @Slf4j
 @Service
 @Transactional
@@ -30,22 +25,20 @@ public class OrderService {
 
   private final OrderEventProducer orderEventProducer;
   private final OrderValidator orderValidator;
-  private final RiskCheckService riskCheckService;
+  private final OrderRiskValidationService riskCheckService;
   private final OrderRepository orderRepository;
   private final SourceType sourceType;
 
   /** 신규 주문 생성 */
-  @RedissonLock(
-      key =  "'order:' + #request.clientOrderId", // 임시"'order:idempotency:' + #userId + ':' + #request.clientOrderId",
-      waitTime = 0L,
-      leaseTime = 30L
-  )
+  @RedissonLock(key = "'order:' + #request.clientOrderId", // 임시"'order:idempotency:' + #userId + ':' +
+                                                           // #request.clientOrderId",
+      waitTime = 0L, leaseTime = 30L)
   public OrderCreateResponse createOrder(OrderCreateRequest request, Long userId) {
     log.info("Creating order: userId={}, clientOrderId={}", userId, request.getClientOrderId());
 
     orderRepository.findByUserIdAndClientOrderId(userId, request.getClientOrderId())
         .ifPresent(existingOrder -> {
-          log.warn(" Duplicate order detected: userId={}, clientOrderId={}",
+          log.warn("Duplicate order detected (App Check): userId={}, clientOrderId={}",
               userId, request.getClientOrderId());
           throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);
         });
@@ -67,17 +60,21 @@ public class OrderService {
         request.getPrice(),
         request.getQuantity());
 
-    orderRepository.save(order);
+    try {
+      orderRepository.save(order);
+    } catch (DataIntegrityViolationException e) {
+      log.error("Duplicate order detected (DB Constraint): userId={}, clientOrderId={}",
+          userId, request.getClientOrderId());
+      throw new CustomException(TradingErrorCode.DUPLICATE_ORDER);
+    }
 
     orderEventProducer.publishNewOrder(order);
 
-    // 4. 응답 반환
     return OrderCreateResponse.builder()
         .clientOrderId(order.getClientOrderId())
         .status("ACCEPTED")
         .message("Order received")
         .build();
-
   }
 
   /** 주문 취소 */
