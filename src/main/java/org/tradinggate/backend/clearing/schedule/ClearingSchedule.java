@@ -43,7 +43,7 @@ public class ClearingSchedule {
 
     @Scheduled(cron = "0 */5 * * * *") // 5분마다
     public void repair() {
-        int repaired = clearingOutboxRepairService.repairRecentSuccessBatches();
+        int repaired = clearingOutboxRepairService.repairRecentBatches();
         if (repaired > 0) {
             log.info("[CLEARING][REPAIR] repairedBatches={}", repaired);
         }

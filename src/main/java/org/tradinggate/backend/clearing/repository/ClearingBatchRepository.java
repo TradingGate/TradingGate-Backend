@@ -11,6 +11,7 @@ import org.tradinggate.backend.clearing.domain.ClearingBatch;
 import org.tradinggate.backend.clearing.domain.ClearingResult;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchStatus;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
+import org.tradinggate.backend.clearing.domain.e.ClearingFailureCode;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,8 +35,10 @@ public interface ClearingBatchRepository extends JpaRepository<ClearingBatch, Lo
         update ClearingBatch b
            set b.status = :running,
                b.startedAt = :startedAt,
+               b.snapshotKey = :snapshotKey,
                b.cutoffOffsets = :cutoffOffsets,
-               b.marketSnapshotId = :marketSnapshotId
+               b.failureCode = null,
+               b.remark = null
          where b.id = :batchId
            and b.status = :pending
     """)
@@ -44,8 +47,8 @@ public interface ClearingBatchRepository extends JpaRepository<ClearingBatch, Lo
             @Param("pending") ClearingBatchStatus pending,
             @Param("running") ClearingBatchStatus running,
             @Param("startedAt") Instant startedAt,
-            @Param("cutoffOffsets") Map<String, Long> cutoffOffsets,
-            @Param("marketSnapshotId") Long marketSnapshotId
+            @Param("snapshotKey") String snapshotKey,
+            @Param("cutoffOffsets") Map<String, Long> cutoffOffsets
     );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -53,6 +56,7 @@ public interface ClearingBatchRepository extends JpaRepository<ClearingBatch, Lo
         update ClearingBatch b
            set b.status = :success,
                b.finishedAt = :finishedAt,
+               b.failureCode = null,
                b.remark = null
          where b.id = :batchId
     """)
@@ -65,12 +69,14 @@ public interface ClearingBatchRepository extends JpaRepository<ClearingBatch, Lo
         update ClearingBatch b
            set b.status = :failed,
                b.finishedAt = :finishedAt,
+               b.failureCode = :failureCode,
                b.remark = :remark
          where b.id = :batchId
     """)
     int markFailed(@Param("batchId") Long batchId,
                    @Param("failed") ClearingBatchStatus failed,
                    @Param("finishedAt") Instant finishedAt,
+                   @Param("failureCode") ClearingFailureCode failureCode,
                    @Param("remark") String remark);
 
     Page<ClearingBatch> findByStatusAndCreatedAtAfterOrderByCreatedAtAsc(

@@ -14,7 +14,6 @@ public interface ClearingBatchContextProvider {
     ClearingBatchContext resolve(LocalDate businessDate, ClearingBatchType batchType, String scope);
 
     record ClearingBatchContext(
-            Map<String, Long> cutoffOffsets,
-            Long marketSnapshotId
+            Map<String, Long> watermarkOffsets
     ) {}
 }

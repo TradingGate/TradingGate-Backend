@@ -1,14 +1,14 @@
-package org.tradinggate.backend.clearing.dto;
+package org.tradinggate.backend.recon.dto;
 
 import java.math.BigDecimal;
 
-public record ClearingResultRow(
+public record ReconRow(
         Long accountId,
         String asset,
         BigDecimal openingBalance,
         BigDecimal closingBalance,
         BigDecimal netChange,
         BigDecimal feeTotal,
-        long tradeCount,
+        Long tradeCount,
         BigDecimal tradeValue
 ) {}

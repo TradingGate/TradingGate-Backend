@@ -27,19 +27,25 @@ import java.util.stream.Collectors;
 public class StubClearingInputsPort implements ClearingInputsPort {
 
     @Override
-    public List<AccountSymbol> resolveUniverse(ClearingComputationContext ctx) {
-        // 왜: scope 파싱은 ctx 생성 시 1회만 수행하는 게 목표지만, 혹시 ctx.scopeSpec이 null로 들어와도 안전하게 동작시킨다.
-        ClearingScopeSpec spec = Objects.requireNonNull(ctx.scopeSpec(), () -> "scopeSpec is null in ctx. batchId=" + ctx.batchId());
-        log.debug("[CLEARING] universe resolved by stub. scope={} specType={}", ctx.scopeRaw(), spec.type());
+    public List<AccountAsset> resolveUniverse(ClearingComputationContext ctx) {
+        ClearingScopeSpec spec = Objects.requireNonNull(
+                ctx.scopeSpec(),
+                () -> "scopeSpec is null in ctx. batchId=" + ctx.batchId()
+        );
 
-        List<AccountSymbol> base = List.of(
-                new AccountSymbol(1001L, 1L),
-                new AccountSymbol(1001L, 2L),
-                new AccountSymbol(1002L, 1L)
+        log.debug("[CLEARING] universe resolved by stub. scope batchId={} specType={}",
+                ctx.batchId(), spec.type());
+
+        // v2는 (account, asset)
+        List<AccountAsset> base = List.of(
+                new AccountAsset(1001L, "USDT"),
+                new AccountAsset(1001L, "BTC"),
+                new AccountAsset(1002L, "USDT")
         );
 
         return switch (spec.type()) {
             case ALL -> base;
+
             case ACCOUNT_RANGE -> {
                 long from = spec.accountRange().fromInclusive();
                 long to = spec.accountRange().toInclusive();
@@ -47,71 +53,63 @@ public class StubClearingInputsPort implements ClearingInputsPort {
                         .filter(x -> x.accountId() >= from && x.accountId() <= to)
                         .toList();
             }
-            case SYMBOL_SET -> {
-                Set<Long> allowed = spec.symbolIds().stream().collect(Collectors.toSet());
-                yield base.stream()
-                        .filter(x -> allowed.contains(x.symbolId()))
-                        .toList();
-            }
+
             case CHUNK -> {
                 int index = spec.chunk().index();
                 int total = spec.chunk().total();
                 yield base.stream()
                         .filter(x -> {
-                            // 왜: chunk는 accountId 해시 기반으로 분산하여 대상 유니버스를 샤딩한다(NFR-C-03).
                             int h = Long.hashCode(x.accountId());
                             return Math.floorMod(h, total) == index;
                         })
                         .toList();
             }
+
+            // v2에서는 symbol 기반 스코프가 의미가 없어서 사고 방지용 fail-fast 추천
+            case SYMBOL_SET -> throw new IllegalArgumentException(
+                    "SYMBOL_SET scope is not supported in v2 clearing. scope batchId=" + ctx.batchId()
+            );
         };
     }
 
     @Override
-    public OpeningPosition loadOpening(ClearingComputationContext ctx, Long accountId, Long symbolId) {
-        LocalDate businessDate = ctx.businessDate();
-        log.debug("[CLEARING] opening resolved by stub. date={} accountId={} symbolId={}", businessDate, accountId, symbolId);
-        return new OpeningPosition(BigDecimal.ZERO, null);
+    public BalanceSnapshot loadOpeningBalance(ClearingComputationContext ctx, Long accountId, String asset) {
+        log.debug("[CLEARING] openingBalance resolved by stub. date={} accountId={} asset={}",
+                ctx.businessDate(), accountId, asset);
+
+        // MVP: opening이 없으면 null 허용이므로 그냥 null로 둬도 OK.
+        // 데모에서 netChange를 보고 싶으면 0을 넣어도 됨.
+        return null;
     }
 
     @Override
-    public TradeAgg aggregateTrades(ClearingComputationContext ctx, Long accountId, Long symbolId) {
-        // cutoffOffsets는 정합성 기준점. stub에서도 null이면 사고이므로 fail-fast 한다.
+    public BalanceSnapshot loadClosingBalance(ClearingComputationContext ctx, Long accountId, String asset) {
+        log.debug("[CLEARING] closingBalance resolved by stub. date={} accountId={} asset={}", ctx.businessDate(), accountId, asset);
+
+        // 데모용: accountId/asset에 따라 deterministic balance 생성
+        BigDecimal base = BigDecimal.valueOf(accountId % 1000); // 1~999
+        BigDecimal total = "USDT".equals(asset) ? base.multiply(BigDecimal.valueOf(100)) : base;
+        BigDecimal available = total.multiply(BigDecimal.valueOf(0.9));
+        BigDecimal locked = total.subtract(available);
+
+        return new BalanceSnapshot(total, available, locked);
+    }
+
+    @Override
+    public LedgerAgg aggregateLedger(ClearingComputationContext ctx, Long accountId, String asset) {
         if (ctx.cutoffOffsets() == null) {
             throw new IllegalStateException("cutoffOffsets is null in ctx. batchId=" + ctx.batchId());
         }
-        log.debug("[CLEARING] tradeAgg resolved by stub. date={} accountId={} symbolId={} cutoffKeys={}",
-                ctx.businessDate(), accountId, symbolId, ctx.cutoffOffsets().keySet());
+
         long salt = ctx.cutoffOffsets().values().stream().mapToLong(Long::longValue).sum();
-        BigDecimal netQty = BigDecimal.valueOf(salt % 3); // 0~2 사이
-        return new TradeAgg(netQty, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
-    }
+        log.debug("[CLEARING] ledgerAgg resolved by stub. date={} accountId={} asset={} cutoffKeys={}",
+                ctx.businessDate(), accountId, asset, ctx.cutoffOffsets().keySet());
 
-    @Override
-    public SymbolInfo loadSymbolInfo(ClearingComputationContext ctx, Long symbolId) {
-        log.debug("[CLEARING] symbolInfo resolved by stub. symbolId={}", symbolId);
-        return new SymbolInfo(symbolId == 2L ? ProductType.DERIVATIVE : ProductType.SPOT);
-    }
+        // 데모용: watermark에 따라 변하는 값
+        BigDecimal feeTotal = BigDecimal.valueOf(salt % 5);          // 0~4
+        long tradeCount = salt % 20;                                 // 0~19
+        BigDecimal tradeValue = BigDecimal.valueOf((salt % 100) * 10);// 0~990
 
-    @Override
-    public PriceSnapshot loadPriceSnapshot(ClearingComputationContext ctx, Long symbolId) {
-        if (ctx.marketSnapshotId() == null) {
-            throw new IllegalStateException("marketSnapshotId is null in ctx. batchId=" + ctx.batchId());
-        }
-        log.debug("[CLEARING] priceSnapshot resolved by stub. snapshotId={} symbolId={}", ctx.marketSnapshotId(), symbolId);
-        if (symbolId == 2L) {
-            return new PriceSnapshot(
-                    BigDecimal.valueOf(101),
-                    BigDecimal.valueOf(102),
-                    BigDecimal.valueOf(103),
-                    BigDecimal.valueOf(104)
-            );
-        }
-        return new PriceSnapshot(
-                BigDecimal.valueOf(201),
-                BigDecimal.valueOf(202),
-                BigDecimal.valueOf(203),
-                BigDecimal.valueOf(204)
-        );
+        return new LedgerAgg(feeTotal, tradeCount, tradeValue);
     }
 }

@@ -19,6 +19,7 @@ import org.tradinggate.backend.clearing.service.port.ClearingBatchContextProvide
 import org.tradinggate.backend.clearing.service.port.ClearingCalculator;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 @Log4j2
 @Service
@@ -34,7 +35,6 @@ public class ClearingBatchRunner {
     private final ClearingCalculator clearingCalculator;
 
     private final ClearingScopeSpecParser scopeParser;
-    private final ClearingBatchContextValidator clearingBatchContextValidator;
 
     /**
      * Clearing 배치 실행을 트리거한다.
@@ -43,15 +43,15 @@ public class ClearingBatchRunner {
     public void run(LocalDate businessDate, ClearingBatchType batchType, String scope, ClearingBatchTriggerPolicy policy) {
         ClearingBatch batch = clearingBatchService.getOrCreatePending(businessDate, batchType, scope);
 
-        ClearingBatchStatus status = batch.getStatus();
+        String normalizedScope = batch.getScope();
 
+        ClearingBatchStatus status = batch.getStatus();
         ClearingTriggerDecision decision = policy.decide(status);
+
         if (decision.type() == ClearingTriggerDecisionType.SKIP) {
-            //스케줄 중복 호출은 정상 케이스가 많아 노이즈를 줄이기 위해 조용히 종료한다.
             log.info("[CLEARING] skipped by policy. batchId={} status={} reason={}", batch.getId(), status, decision.reason());
             return;
         }
-
         if (decision.type() == ClearingTriggerDecisionType.REJECT) {
             ClearingFailureCode code = mapRejectToFailureCode(status);
             log.info("[CLEARING] rejected by policy. batchId={} status={} code={} reason={}",
@@ -61,13 +61,13 @@ public class ClearingBatchRunner {
 
         ClearingBatchContext batchContext;
         try {
-            batchContext = provider.resolve(businessDate, batchType, scope);
+            batchContext = provider.resolve(businessDate, batchType, normalizedScope);
         } catch (Exception e) {
-            clearingBatchService.markFailed(batch.getId(), ClearingFailureCode.CUTOFF_RESOLVE_FAILED, summarize(e));
+            clearingBatchService.markFailed(batch.getId(), ClearingFailureCode.WATERMARK_RESOLVE_FAILED, summarize(e));
             throw e;
         }
 
-        clearingBatchContextValidator.validate(batch.getId(), batchType, scope, batchContext);
+        validate(batch.getId(), batchType, scope, batchContext);
 
         boolean acquired = clearingBatchService.tryMarkRunning(batch.getId(), batchContext);
         if (!acquired) {
@@ -75,18 +75,14 @@ public class ClearingBatchRunner {
             return;
         }
 
-        // tryMarkRunning은 UPDATE 쿼리로 기준점을 저장하므로, 이후 단계는 DB의 확정 값을 기준으로 진행해야 한다.
         batch = clearingBatchService.findById(batch.getId());
 
-        // scope는 여기서 한 번만 파싱해서 ctx에 고정
         ClearingScopeSpec spec = scopeParser.parse(batch.getScope());
         ClearingComputationContext ctx = ClearingComputationContext.from(batch, spec);
 
         try {
             clearingResultWriter.upsertResults(batch, clearingCalculator.calculate(ctx));
-
             clearingOutboxService.enqueueSettlementEvents(batch.getId());
-
             clearingBatchService.markSuccess(batch.getId());
         } catch (Exception e) {
             clearingBatchService.markFailed(batch.getId(), ClearingFailureCode.UNEXPECTED_ERROR, summarize(e));
@@ -106,5 +102,26 @@ public class ClearingBatchRunner {
     private String summarize(Exception e) {
         String msg = e.getClass().getSimpleName() + ": " + (e.getMessage() == null ? "" : e.getMessage());
         return msg.length() <= 255 ? msg : msg.substring(0, 255);
+    }
+
+    public void validate(Long batchId, ClearingBatchType batchType, String scope, ClearingBatchContext ctx) {
+        if (ctx == null) {
+            throw new IllegalStateException("batchContext is null. batchId=" + batchId + ", type=" + batchType + ", scope=" + scope);
+        }
+
+        Map<String, Long> offsets = ctx.watermarkOffsets();
+        if (offsets == null || offsets.isEmpty()) {
+            throw new IllegalStateException("watermarkOffsets is empty. batchId=" + batchId + ", type=" + batchType + ", scope=" + scope);
+        }
+
+        for (var e : offsets.entrySet()) {
+            if (e.getKey() == null || e.getKey().isBlank()) {
+                throw new IllegalStateException("watermarkOffsets contains blank partition. batchId=" + batchId);
+            }
+            if (e.getValue() == null || e.getValue() < 0) {
+                throw new IllegalStateException("watermarkOffsets contains invalid offset. batchId=" + batchId
+                        + ", partition=" + e.getKey() + ", offset=" + e.getValue());
+            }
+        }
     }
 }

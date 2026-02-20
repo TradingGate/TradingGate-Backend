@@ -12,11 +12,16 @@ import org.tradinggate.backend.clearing.domain.e.ClearingBatchStatus;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
 import org.tradinggate.backend.clearing.repository.ClearingBatchRepository;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
+import static java.nio.charset.StandardCharsets.*;
 import static org.tradinggate.backend.clearing.service.port.ClearingBatchContextProvider.*;
+import static org.tradinggate.backend.matching.snapshot.util.SnapshotCryptoUtils.sha256Hex;
 
 @Service
 @RequiredArgsConstructor
@@ -63,39 +68,21 @@ public class ClearingBatchService {
     public boolean tryMarkRunning(Long batchId, ClearingBatchContext batchContext) {
         Instant now = Instant.now();
 
+        Map<String, Long> watermark = requireNonNullWatermarkOffsets(batchId, batchContext);
+        String snapshotKey = snapshotKeyOf(watermark);
+
+        validateRunningPrerequisites(batchId, snapshotKey, watermark);
+
         int updated = clearingBatchRepository.tryMarkRunning(
                 batchId,
                 ClearingBatchStatus.PENDING,
                 ClearingBatchStatus.RUNNING,
                 now,
-                requireNonNullCutoffOffsets(batchId, batchContext),
-                batchContext.marketSnapshotId()
+                snapshotKey,
+                watermark
         );
 
         return updated == 1;
-    }
-
-    public ClearingBatch createRetryBatch(Long failedBatchId) {
-        ClearingBatch prev = clearingBatchRepository.findById(failedBatchId)
-                .orElseThrow(() -> new IllegalStateException("ClearingBatch not found. batchId=" + failedBatchId));
-
-        if (prev.getStatus() != ClearingBatchStatus.FAILED) {
-            return prev;
-        }
-
-        int nextAttempt = prev.getAttempt() + 1;
-        ClearingBatch retry = ClearingBatch.builder()
-                .businessDate(prev.getBusinessDate())
-                .batchType(prev.getBatchType())
-                .runKey(prev.getRunKey())
-                .attempt(nextAttempt)
-                .retryOfBatchId(prev.getId())
-                .scope(normalizeScope(prev.getScope()))
-                .status(ClearingBatchStatus.PENDING)
-                .cutoffOffsets(Map.of())
-                .build();
-
-        return clearingBatchRepository.saveAndFlush(retry);
     }
 
     @Transactional
@@ -106,7 +93,14 @@ public class ClearingBatchService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(Long batchId, ClearingFailureCode failureCode, String detail) {
         String remark = formatRemark(failureCode, detail);
-        clearingBatchRepository.markFailed(batchId, ClearingBatchStatus.FAILED, Instant.now(), remark);
+        clearingBatchRepository.markFailed(batchId, ClearingBatchStatus.FAILED, Instant.now(), failureCode, remark);
+    }
+
+    private Map<String, Long> requireNonNullWatermarkOffsets(Long batchId, ClearingBatchContext batchContext) {
+        if (batchContext.watermarkOffsets() == null) {
+            throw new IllegalStateException("watermarkOffsets is null. batchId=" + batchId);
+        }
+        return batchContext.watermarkOffsets();
     }
 
     private ClearingBatch createPendingWithUniqGuard(LocalDate businessDate, ClearingBatchType batchType, String runKey, int attempt, String scope) {
@@ -119,19 +113,35 @@ public class ClearingBatchService {
         }
     }
 
+    /**
+     * watermarkOffsets를 canonical form으로 정규화한 뒤 짧은 스냅샷 키를 만든다.
+     * - 왜: 운영/이벤트에서 사람이 참조하기 쉬운 "스냅샷 아이디"가 필요하다.
+     * - 재현성: 같은 watermark면 같은 키.
+     */
+    private String snapshotKeyOf(Map<String, Long> watermarkOffsets) {
+        // canonical: partition 오름차순 정렬 후 "p=offset" 조합
+        List<String> parts = watermarkOffsets.entrySet().stream()
+                .sorted((a,b) -> {
+                    Integer ia = tryParseInt(a.getKey());
+                    Integer ib = tryParseInt(b.getKey());
+                    if (ia != null && ib != null) return Integer.compare(ia, ib);
+                    return a.getKey().compareTo(b.getKey());
+                })
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .toList();
+
+        String canonical = String.join(",", parts);
+
+        // SHA-256 -> 앞 12~16 chars 사용 (32 길이 제한 내)
+        String hex = sha256Hex(canonical.getBytes(UTF_8));
+        return "WM-" + hex.substring(0, 12);
+    }
+
     private String formatRemark(ClearingFailureCode code, String detail) {
         // remark에 운영 분류 코드가 반드시 남아야 사후 집계/대응이 가능하다.
         String safeDetail = detail == null ? "" : detail;
         String raw = code.getCode() + "|" + safeDetail;
         return raw.length() <= 255 ? raw : raw.substring(0, 255);
-    }
-
-    private Map<String, Long> requireNonNullCutoffOffsets(Long batchId, ClearingBatchContext batchContext) {
-        // 왜: cutoffOffsets는 RUNNING 진입 시 확정되어야 하며, null이면 정합성(NFR-C-01) 검증이 불가능하다.
-        if (batchContext.cutoffOffsets() == null) {
-            throw new IllegalStateException("cutoffOffsets is null. batchId=" + batchId);
-        }
-        return batchContext.cutoffOffsets();
     }
 
     private String normalizeScope(String scope) {
@@ -148,5 +158,14 @@ public class ClearingBatchService {
         long bucketSeconds = INTRADAY_BUCKET_MINUTES * 60L;
         long bucketStart = (epochSeconds / bucketSeconds) * bucketSeconds;
         return "INTRADAY-" + bucketStart;
+    }
+
+    public void validateRunningPrerequisites(Long batchId, String snapshotKey, Map<String, Long> watermarkOffsets) {
+        if (snapshotKey == null || snapshotKey.isBlank()) {
+            throw new IllegalStateException("snapshotKey is blank. batchId=" + batchId);
+        }
+        if (watermarkOffsets == null || watermarkOffsets.isEmpty()) {
+            throw new IllegalStateException("watermarkOffsets is empty. batchId=" + batchId);
+        }
     }
 }

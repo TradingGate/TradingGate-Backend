@@ -21,59 +21,60 @@ import java.time.Instant;
 public class ClearingOutboxRepairService {
 
     private static final int PAGE_SIZE = 1000;
-    private static final int LOOKBACK_MINUTES = 180; // 최근 3시간만 보수(임시)
+    private static final int LOOKBACK_MINUTES = 180;
 
     private final ClearingBatchRepository clearingBatchRepository;
     private final ClearingResultRepository clearingResultRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final ClearingOutboxRepairWorker clearingOutboxRepairWorker;
 
-    /**
-     * 최근 성공 배치 중 outbox 누락이 있는 배치를 찾아 복구한다.
-     *
-     * @return 복구 수행한 배치 수(= repairOneBatch 호출한 배치 수)
-     */
-    public int repairRecentSuccessBatches() {
+    public int repairRecentBatches() {
         Instant since = Instant.now().minusSeconds(LOOKBACK_MINUTES * 60L);
 
+        int repaired = 0;
+        repaired += repairByStatusSince(ClearingBatchStatus.SUCCESS, since);
+        repaired += repairByStatusSince(ClearingBatchStatus.FAILED, since);
+
+        return repaired;
+    }
+
+    private int repairByStatusSince(ClearingBatchStatus status, Instant since) {
         int repaired = 0;
         int page = 0;
 
         while (true) {
             Page<ClearingBatch> batches = clearingBatchRepository
                     .findByStatusAndCreatedAtAfterOrderByCreatedAtAsc(
-                            ClearingBatchStatus.SUCCESS,
+                            status,
                             since,
                             PageRequest.of(page, PAGE_SIZE)
                     );
 
-            if (batches.isEmpty()) {
-                break;
-            }
+            if (batches.isEmpty()) break;
 
             for (ClearingBatch b : batches.getContent()) {
-                if (needsRepair(b.getId())) {
+                if (needsRepairAndHasResults(b.getId())) {
                     try {
                         clearingOutboxRepairWorker.repairOneBatch(b.getId(), prefix(b.getId()));
                         repaired++;
                     } catch (Exception e) {
-                        // 보수 작업은 best-effort이며, 한 배치 실패가 전체 보수 루프를 멈추지 않도록 한다.
-                        log.warn("[CLEARING][REPAIR] failed. batchId={}, err={}", b.getId(), summarize(e));
+                        log.warn("[CLEARING][REPAIR] failed. batchId={}, status={}, err={}",
+                                b.getId(), status, summarize(e));
                     }
                 }
             }
 
-            if (!batches.hasNext()) {
-                break;
-            }
+            if (!batches.hasNext()) break;
             page++;
         }
 
         return repaired;
     }
 
-    private boolean needsRepair(Long batchId) {
+    private boolean needsRepairAndHasResults(Long batchId) {
         long expected = clearingResultRepository.countByBatch_Id(batchId);
+        if (expected <= 0) return false;
+
         long actual = outboxEventRepository.countByIdempotencyKeyPrefix(prefix(batchId));
         return expected != actual;
     }

@@ -6,6 +6,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchStatus;
 import org.tradinggate.backend.clearing.domain.e.ClearingBatchType;
+import org.tradinggate.backend.clearing.domain.e.ClearingFailureCode;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,7 +23,8 @@ import java.util.Map;
         },
         indexes = {
                 @Index(name = "idx_clearing_batch_business_type_run", columnList = "business_date, batch_type, run_key"),
-                @Index(name = "idx_clearing_batch_status_created", columnList = "status, created_at")
+                @Index(name = "idx_clearing_batch_status_created", columnList = "status, created_at"),
+                @Index(name = "idx_clearing_batch_snapshot_key", columnList = "snapshot_key")
         }
 )
 @Getter
@@ -61,19 +63,27 @@ public class ClearingBatch {
     @Column(name="finished_at")
     private Instant finishedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "failure_code", length = 32)
+    private ClearingFailureCode failureCode;
+
     @Column(name="remark", length = 255)
     private String remark;
 
     /**
-     * Kafka partition -> offset
-     * e.g. {"0":1234,"1":5678}
+     * 워터마크 스냅샷 키 (결정론적/짧은 ID)
+     * - RUNNING 선점 시점에 watermarkOffsets로부터 생성되어 고정된다.
+     * - 이벤트/로그/운영에서 참조하기 쉬운 "스냅샷 아이디" 역할.
+     */
+    @Column(name = "snapshot_key", length = 32)
+    private String snapshotKey;
+
+    /**
+     * partition -> last_processed_offset (정합성 기준점)
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name="cutoff_offsets", nullable = false, columnDefinition = "jsonb")
     private Map<String, Long> cutoffOffsets;
-
-    @Column(name="market_snapshot_id")
-    private Long marketSnapshotId;
 
     @Column(name="scope", length = 64)
     private String scope;
@@ -84,7 +94,6 @@ public class ClearingBatch {
     @Column(name="updated_at", nullable = false)
     private Instant updatedAt;
 
-    // === Factory methods ===
     public static ClearingBatch pending(LocalDate businessDate, ClearingBatchType type, String runKey, int attempt, String scope) {
         return ClearingBatch.builder()
                 .businessDate(businessDate)
@@ -97,27 +106,29 @@ public class ClearingBatch {
                 .build();
     }
 
-    // === Domain state transition methods ===
-    public void markRunning(Map<String, Long> cutoffOffsets, Long marketSnapshotId) {
+    public void markRunning(String snapshotKey, Map<String, Long> watermarkOffsets) {
         this.status = ClearingBatchStatus.RUNNING;
         this.startedAt = Instant.now();
-        this.cutoffOffsets = cutoffOffsets;
-        this.marketSnapshotId = marketSnapshotId;
+        this.snapshotKey = snapshotKey;
+        this.cutoffOffsets = watermarkOffsets;
+        this.failureCode = null;
+        this.remark = null;
     }
 
     public void markSuccess() {
         this.status = ClearingBatchStatus.SUCCESS;
         this.finishedAt = Instant.now();
+        this.failureCode = null;
         this.remark = null;
     }
 
-    public void markFailed(String remark) {
+    public void markFailed(ClearingFailureCode failureCode, String remark) {
         this.status = ClearingBatchStatus.FAILED;
         this.finishedAt = Instant.now();
+        this.failureCode = failureCode;
         this.remark = truncate(remark, 255);
     }
 
-    // === JPA lifecycle callbacks ===
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -132,7 +143,6 @@ public class ClearingBatch {
         this.updatedAt = Instant.now();
     }
 
-    // === Internal helpers ===
     private static String truncate(String s, int max) {
         if (s == null) return null;
         return s.length() <= max ? s : s.substring(0, max);

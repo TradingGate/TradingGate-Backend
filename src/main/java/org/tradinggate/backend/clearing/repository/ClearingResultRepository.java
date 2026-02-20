@@ -14,4 +14,5 @@ public interface ClearingResultRepository extends JpaRepository<ClearingResult, 
     long countByBatch_Id(Long batchId);
 
     Page<ClearingResult> findByBatchId(Long batchId, Pageable pageable);
+
 }

@@ -8,25 +8,20 @@ import java.util.Map;
 
 public record ClearingComputationContext(
         Long batchId,
+        String snapshotKey,
         LocalDate businessDate,
         ClearingBatchType batchType,
-        String scopeRaw,
-        ClearingScopeSpec scopeSpec,
         Map<String, Long> cutoffOffsets,
-        Long marketSnapshotId
+        ClearingScopeSpec scopeSpec
 ) {
-    public static ClearingComputationContext from(
-            ClearingBatch batch,
-            ClearingScopeSpec scopeSpec
-    ) {
+    public static ClearingComputationContext from(ClearingBatch batch, ClearingScopeSpec spec) {
         return new ClearingComputationContext(
                 batch.getId(),
+                batch.getSnapshotKey(),
                 batch.getBusinessDate(),
                 batch.getBatchType(),
-                batch.getScope(),
-                scopeSpec,
                 batch.getCutoffOffsets(),
-                batch.getMarketSnapshotId()
+                spec
         );
     }
 }

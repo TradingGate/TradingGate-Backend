@@ -23,9 +23,6 @@ public class ClearingScopeSpecParser {
         if (s.startsWith("account:")) {
             return parseAccountRange(s.substring("account:".length()));
         }
-        if (s.startsWith("symbol:")) {
-            return parseSymbolSet(s.substring("symbol:".length()));
-        }
         if (s.startsWith("chunk:")) {
             return parseChunk(s.substring("chunk:".length()));
         }
@@ -42,17 +39,6 @@ public class ClearingScopeSpecParser {
         long from = parsePositiveLong(parts[0].trim(), "account.from");
         long to = parsePositiveLong(parts[1].trim(), "account.to");
         return ClearingScopeSpec.accountRange(from, to);
-    }
-
-    private ClearingScopeSpec parseSymbolSet(String raw) {
-        String v = raw.trim();
-        if (v.isEmpty()) throw new IllegalArgumentException("invalid symbol scope. empty.");
-        String[] parts = v.split(",");
-        List<Long> ids = new ArrayList<>(parts.length);
-        for (String p : parts) {
-            ids.add(parsePositiveLong(p.trim(), "symbolId"));
-        }
-        return ClearingScopeSpec.symbolSet(ids);
     }
 
     private ClearingScopeSpec parseChunk(String raw) {

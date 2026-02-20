@@ -55,7 +55,7 @@ public class ClearingOutboxService {
             }
 
             for (ClearingResult r : results.getContent()) {
-                String idemKey = idempotencyKey(batchId, r.getAccountId(), r.getSymbolId());
+                String idemKey = idempotencyKey(batchId, r.getAccountId(), r.getAsset());
                 Map<String, Object> payload = settlementEventBuilder.build(batch, r);
 
                 outboxAppender.append(
@@ -80,9 +80,8 @@ public class ClearingOutboxService {
 
     }
 
-    private String idempotencyKey(Long batchId, Long accountId, Long symbolId) {
-        // 왜: "1 result -> 1 event" 규칙을 (batchId, accountId, symbolId)로 고정하여 멱등 삽입을 보장한다.
-        return "clearing:settlement:" + batchId + ":" + accountId + ":" + symbolId;
+    private String idempotencyKey(Long batchId, Long accountId, String asset) {
+        return "clearing:settlement:" + batchId + ":" + accountId + ":" + asset;
     }
 
     private String prefix(Long batchId) {

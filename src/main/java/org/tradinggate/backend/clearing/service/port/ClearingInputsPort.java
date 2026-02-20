@@ -3,56 +3,50 @@ package org.tradinggate.backend.clearing.service.port;
 import org.tradinggate.backend.clearing.dto.ClearingComputationContext;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 public interface ClearingInputsPort {
 
     /**
-     * @return 정산 대상 (accountId, symbolId) 목록
+     * @return scope 반영된 정산 대상 (accountId, asset) 목록
      */
-    List<AccountSymbol> resolveUniverse(ClearingComputationContext ctx);
+    List<AccountAsset> resolveUniverse(ClearingComputationContext ctx);
 
     /**
-     * @return opening 기준값(전일 EOD 등). 없으면 0/NULL로 처리 가능.
+     * @return opening 기준값(전일 EOD FINAL 결과 등). 없으면 null 허용(MVP)
      */
-    OpeningPosition loadOpening(ClearingComputationContext ctx, Long accountId, Long symbolId);
+    BalanceSnapshot loadOpeningBalance(ClearingComputationContext ctx, Long accountId, String asset);
 
     /**
-     * @return 당일(또는 구간) 거래 집계. cutoff 기준은 ctx.cutoffOffsets를 사용한다.
+     * @return closing 기준값(현재 account_balance 스냅샷). v2에서 필수.
      */
-    TradeAgg aggregateTrades(ClearingComputationContext ctx, Long accountId, Long symbolId);
+    BalanceSnapshot loadClosingBalance(ClearingComputationContext ctx, Long accountId, String asset);
 
     /**
-     * @return 심볼 속성(현물/파생 분기)
+     * @return 당일(또는 구간) 거래 요약 집계.
+     * - feeTotal/tradeCount/tradeValue 산출
+     * - 집계 범위 제한이 필요하면 ctx.cutoffOffsets를 사용한다.
      */
-    SymbolInfo loadSymbolInfo(ClearingComputationContext ctx, Long symbolId);
+    LedgerAgg aggregateLedger(ClearingComputationContext ctx, Long accountId, String asset);
+
+    record AccountAsset(Long accountId, String asset) {}
+
+    record BalanceSnapshot(
+            BigDecimal totalBalance,
+            BigDecimal availableBalance,
+            BigDecimal lockedBalance
+    ) {}
+
+    record LedgerAgg(
+            BigDecimal feeTotal,
+            long tradeCount,
+            BigDecimal tradeValue
+    ) {}
 
     /**
-     * @return ctx.marketSnapshotId 기준 시세 스냅샷
-     */
-    PriceSnapshot loadPriceSnapshot(ClearingComputationContext ctx, Long symbolId);
-
-    record AccountSymbol(Long accountId, Long symbolId) {}
-
-    /**
-     * openingPrice = 평균단가(원가) 기준으로 보는 게 정산 관점에서 실무적.
-     * prevClose 등 리포팅용 기준점이 필요하면 별도 필드로 분리 권장.
-     */
-    record OpeningPosition(BigDecimal openingQty, BigDecimal openingAvgPrice) {}
-
-    record TradeAgg(BigDecimal netQty, BigDecimal realizedPnl, BigDecimal fee, BigDecimal funding) {}
-
-    enum ProductType { SPOT, DERIVATIVE }
-
-    record SymbolInfo(ProductType productType) {}
-
-    record PriceSnapshot(BigDecimal last, BigDecimal close, BigDecimal mark, BigDecimal settlement) {}
-
-    /**
-     * cutoffOffsets는 "어디까지 trade를 포함할지"를 결정하는 기준점이다.
-     * ledger 연동 시 aggregateTrades가 ctx.cutoffOffsets를 사용해 집계 범위를 제한해야 한다.
+     * cutoffOffsets는 "어디까지 반영된 trade/ledger를 포함할지"를 결정하는 기준점이다.
+     * - v2에서는 calculator가 아닌 inputs 구현이 필요 시 이를 사용해 범위를 제한한다.
      */
     default Map<String, Long> cutoffOffsets(ClearingComputationContext ctx) {
         return ctx.cutoffOffsets();

@@ -19,30 +19,26 @@ public class StubClearingBatchContextProvider implements ClearingBatchContextPro
 
     @Override
     public ClearingBatchContext resolve(LocalDate businessDate, ClearingBatchType batchType, String scope) {
-        Map<String, Long> cutoff = deterministicCutoff(DEFAULT_PARTITIONS, businessDate, batchType);
+        Map<String, Long> watermark = deterministicWatermark(DEFAULT_PARTITIONS, businessDate, batchType);
 
-        long snapshotId = deterministicSnapshotIdByDate(businessDate);
+        log.info("[CLEARING] batchContext resolved by stub. date={} type={} scope={} watermark={}",
+                businessDate, batchType, scope, watermark);
 
-        log.info("[CLEARING] batchContext resolved by stub. date={} type={} scope={} cutoff={} snapshotId={}",
-                businessDate, batchType, scope, cutoff, snapshotId);
-
-        return new ClearingBatchContext(cutoff, snapshotId);
+        return new ClearingBatchContext(watermark);
     }
 
-    private Map<String, Long> deterministicCutoff(int partitions, LocalDate date, ClearingBatchType type) {
-        // 왜: cutoffOffsets도 재현성의 일부. 날짜/타입이 같으면 항상 같은 cutoff가 나와야 한다.
+    private Map<String, Long> deterministicWatermark(int partitions, LocalDate date, ClearingBatchType type) {
         LinkedHashMap<String, Long> m = new LinkedHashMap<>();
-        long base = deterministicSnapshotIdByDate(date) % 10_000; // 너무 큰 숫자 방지용
+        long base = deterministicBaseByDate(date) % 10_000;
         long typeBias = (type == ClearingBatchType.EOD) ? 100 : 10;
 
         for (int p = 0; p < partitions; p++) {
-            // partition마다 offset이 달라서, "cutoff를 실제로 사용했는지" 로그/테스트에서 확인이 쉬워진다.
             m.put(String.valueOf(p), base + typeBias + p);
         }
         return m;
     }
 
-    private long deterministicSnapshotIdByDate(LocalDate date) {
+    private long deterministicBaseByDate(LocalDate date) {
         int y = date.getYear();
         int m = date.getMonthValue();
         int d = date.getDayOfMonth();
