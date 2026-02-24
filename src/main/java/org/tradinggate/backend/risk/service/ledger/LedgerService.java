@@ -26,6 +26,7 @@ public class LedgerService {
       EntryType entryType,
       String tradeId,
       String idempotencyKey) {
+    String normalizedAsset = normalizeAsset(asset);
     // 멱등성 검사
     if (ledgerRepository.existsByIdempotencyKey(idempotencyKey)) {
       log.debug("Duplicate idempotency key detected: {}", idempotencyKey);
@@ -33,7 +34,7 @@ public class LedgerService {
     }
     LedgerEntry entry = LedgerEntry.builder()
         .accountId(accountId)
-        .asset(asset)
+        .asset(normalizedAsset)
         .amount(amount)
         .entryType(entryType)
         .tradeId(tradeId)
@@ -49,6 +50,9 @@ public class LedgerService {
       String baseAsset, BigDecimal baseAmount,
       String quoteAsset, BigDecimal quoteAmount,
       BigDecimal fee, String feeAsset) {
+    baseAsset = normalizeAsset(baseAsset);
+    quoteAsset = normalizeAsset(quoteAsset);
+    feeAsset = normalizeAsset(feeAsset);
     // 1. Base asset 변동 기록
     String baseIdempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, baseAsset, EntryType.TRADE);
     LedgerEntry baseEntry = recordEntry(accountId, baseAsset, baseAmount, EntryType.TRADE, tradeId, baseIdempotencyKey);
@@ -65,5 +69,9 @@ public class LedgerService {
       recordEntry(accountId, feeAsset, fee.negate(), EntryType.FEE, tradeId, feeIdempotencyKey);
     }
     return true; // 정상 처리
+  }
+
+  private String normalizeAsset(String asset) {
+    return asset == null ? null : asset.toUpperCase();
   }
 }

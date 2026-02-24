@@ -23,7 +23,6 @@ import org.tradinggate.backend.matching.snapshot.writer.SnapshotWriteQueue;
  */
 @Log4j2
 @Component
-@Profile("worker")
 @RequiredArgsConstructor
 @Profile("worker")
 public class SnapshotShutdownManager {

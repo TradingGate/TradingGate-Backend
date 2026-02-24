@@ -15,7 +15,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 @Component
-@Profile("worker")
 @RequiredArgsConstructor
 @Profile("worker")
 public class OrderBookRegistry {

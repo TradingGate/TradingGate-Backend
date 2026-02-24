@@ -22,9 +22,12 @@ public abstract class PostgresTcBase {
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         r.add("spring.datasource.username", POSTGRES::getUsername);
         r.add("spring.datasource.password", POSTGRES::getPassword);
+        r.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
 
         // 스키마 자동 생성 전략은 프로젝트 설정에 맞춰 조정
         r.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         r.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        r.add("spring.batch.jdbc.initialize-schema", () -> "never");
+        r.add("spring.sql.init.mode", () -> "never");
     }
 }

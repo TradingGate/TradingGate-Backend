@@ -24,13 +24,14 @@ public class BalanceService {
    */
   @Transactional
   public void updateBalance(Long accountId, String asset, BigDecimal amount) {
+    String normalizedAsset = normalizeAsset(asset);
     AccountBalance balance = balanceRepository
-        .findByAccountIdAndAsset(accountId, asset)
-        .orElseGet(() -> createNewBalance(accountId, asset));
+        .findByAccountIdAndAsset(accountId, normalizedAsset)
+        .orElseGet(() -> createNewBalance(accountId, normalizedAsset));
     balance.addAvailable(amount);
     balanceRepository.save(balance);
     log.info("잔고 업데이트: accountId={}, asset={}, amount={}, new balance={}",
-        accountId, asset, amount, balance.getAvailable());
+        accountId, normalizedAsset, amount, balance.getAvailable());
   }
 
   /**
@@ -38,7 +39,11 @@ public class BalanceService {
    */
   @Transactional
   public void updateBalances(Long accountId, java.util.Map<String, BigDecimal> changes) {
+    java.util.Map<String, BigDecimal> normalized = new java.util.HashMap<>();
     for (java.util.Map.Entry<String, BigDecimal> entry : changes.entrySet()) {
+      normalized.merge(normalizeAsset(entry.getKey()), entry.getValue(), BigDecimal::add);
+    }
+    for (java.util.Map.Entry<String, BigDecimal> entry : normalized.entrySet()) {
       updateBalance(accountId, entry.getKey(), entry.getValue());
     }
   }
@@ -54,5 +59,9 @@ public class BalanceService {
         .locked(BigDecimal.ZERO)
         .updatedAt(LocalDateTime.now())
         .build();
+  }
+
+  private String normalizeAsset(String asset) {
+    return asset == null ? null : asset.toUpperCase();
   }
 }
