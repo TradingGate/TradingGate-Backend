@@ -1,6 +1,7 @@
 package org.tradinggate.backend.risk.api.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.tradinggate.backend.risk.api.dto.response.RiskStateResponse;
@@ -14,6 +15,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/risk")
 @RequiredArgsConstructor
+@Profile("risk")
 public class RiskController {
 
   private final RiskStateService riskStateService;

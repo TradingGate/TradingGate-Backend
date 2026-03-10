@@ -1,0 +1,51 @@
+package org.tradinggate.backend.settlementIntegrity.clearing.schedule;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.context.annotation.Profile;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.tradinggate.backend.settlementIntegrity.clearing.domain.e.ClearingBatchType;
+import org.tradinggate.backend.settlementIntegrity.clearing.service.ClearingBatchRunner;
+import org.tradinggate.backend.settlementIntegrity.clearing.policy.ScheduledClearingBatchTriggerPolicy;
+import org.tradinggate.backend.settlementIntegrity.clearing.service.ClearingOutboxRepairService;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+
+@Log4j2
+@Component
+@RequiredArgsConstructor
+@Profile("clearing")
+public class ClearingSchedule {
+
+    private final ClearingBatchRunner clearingBatchRunner;
+    private final ScheduledClearingBatchTriggerPolicy scheduledPolicy;
+    private final ClearingOutboxRepairService clearingOutboxRepairService;
+
+    /**
+     * 스케줄 트리거는 기본적으로 전체 대상(ALL)로 실행한다.
+     * scope는 null 대신 빈 문자열(=ALL)로 통일해 파싱/로그/키 생성에서 혼선을 줄인다.
+     */
+    private static final String DEFAULT_SCOPE = "";
+
+    // 예시 스케줄. 운영에서는 시장 캘린더에 맞게 cron/timezone을 조정한다.
+    @Scheduled(cron = "0 */10 * * * *")
+    public void runIntraday() {
+        clearingBatchRunner.run(LocalDate.now(ZoneId.of("Asia/Seoul")), ClearingBatchType.INTRADAY, DEFAULT_SCOPE, scheduledPolicy);
+    }
+
+    @Scheduled(cron = "0 0 18 * * *")
+    public void runEod() {
+        clearingBatchRunner.run(LocalDate.now(ZoneId.of("Asia/Seoul")), ClearingBatchType.EOD, DEFAULT_SCOPE, scheduledPolicy);
+    }
+
+    // 멱등 append를 이용해 누락된 settlement outbox 이벤트를 보수적으로 복구한다.
+    @Scheduled(cron = "0 */5 * * * *")
+    public void repair() {
+        int repaired = clearingOutboxRepairService.repairRecentBatches();
+        if (repaired > 0) {
+            log.info("[CLEARING][REPAIR] repairedBatches={}", repaired);
+        }
+    }
+}

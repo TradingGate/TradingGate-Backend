@@ -2,6 +2,7 @@ package org.tradinggate.backend.risk.service.anomaly;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.risk.domain.entity.anomaly.AbnormalPatternLog;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Profile("risk")
 public class AnomalyDetectionService {
 
   private final AbnormalPatternLogRepository anomalyLogRepository;

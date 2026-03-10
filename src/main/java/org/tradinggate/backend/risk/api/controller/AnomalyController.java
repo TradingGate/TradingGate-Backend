@@ -1,6 +1,7 @@
 package org.tradinggate.backend.risk.api.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.tradinggate.backend.risk.api.dto.response.AbnormalPatternResponse;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/risk/anomaly")
 @RequiredArgsConstructor
+@Profile("risk")
 public class AnomalyController {
 
   private final AnomalyDetectionService anomalyDetectionService;
