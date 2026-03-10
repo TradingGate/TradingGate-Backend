@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.tradinggate.backend.trading.domain.entity.Order;
 import org.tradinggate.backend.trading.domain.entity.SourceType;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Builder
@@ -35,7 +35,7 @@ public class OrderCancelEvent {
   private SourceType source;
 
   @JsonProperty("receivedAt")
-  private LocalDateTime receivedAt;
+  private Instant receivedAt;
 
   @Getter
   @Builder
@@ -68,7 +68,7 @@ public class OrderCancelEvent {
             .value(order.getClientOrderId())
             .build())
         .source(sourceType)
-        .receivedAt(LocalDateTime.now())
+        .receivedAt(Instant.now())
         .build();
   }
 
@@ -86,7 +86,7 @@ public class OrderCancelEvent {
             .value(order.getOrderId() != null ? order.getOrderId().toString() : null)
             .build())
         .source(sourceType)
-        .receivedAt(LocalDateTime.now())
+        .receivedAt(Instant.now())
         .build();
   }
 

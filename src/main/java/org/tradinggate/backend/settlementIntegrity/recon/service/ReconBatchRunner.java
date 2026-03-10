@@ -13,6 +13,7 @@ import org.tradinggate.backend.settlementIntegrity.recon.domain.e.ReconFailureCo
 import org.tradinggate.backend.settlementIntegrity.recon.dto.ReconDiffRow;
 import org.tradinggate.backend.settlementIntegrity.recon.dto.ReconRow;
 import org.tradinggate.backend.settlementIntegrity.recon.domain.e.ReconSeverity;
+import org.tradinggate.backend.settlementIntegrity.recon.repository.ReconBatchRepository;
 import org.tradinggate.backend.settlementIntegrity.recon.service.port.ReconInputsPort;
 import org.tradinggate.backend.settlementIntegrity.recon.service.support.ReconComparator;
 
@@ -23,11 +24,12 @@ import java.util.List;
 @Log4j2
 @Service
 @RequiredArgsConstructor
-@Profile("recon")
+@Profile("clearing")
 public class ReconBatchRunner {
 
     private final ReconBatchService reconBatchService;
     private final ClearingBatchRepository clearingBatchRepository;
+    private final ReconBatchRepository reconBatchRepository;
 
     private final ReconInputsPort reconInputsPort;
     private final ReconComparator reconComparator;
@@ -72,6 +74,28 @@ public class ReconBatchRunner {
     }
 
     /**
+     * linked recon 수동 재실행 경로. 같은 clearing batch에 대해 새 attempt를 생성한다.
+     */
+    public void rerunForClearingBatchNewAttempt(Long clearingBatchId) {
+        ClearingBatch clearing = clearingBatchRepository.findById(clearingBatchId)
+                .orElseThrow(() -> new IllegalStateException("ClearingBatch not found. id=" + clearingBatchId));
+
+        if (clearing.getStatus() != ClearingBatchStatus.SUCCESS) {
+            log.info("[RECON] rerun skipped. clearingBatch not SUCCESS. id={} status={}", clearingBatchId, clearing.getStatus());
+            return;
+        }
+
+        ReconBatch latest = reconBatchRepository.findTopByClearingBatchIdOrderByAttemptDesc(clearingBatchId).orElse(null);
+        if (latest == null) {
+            runForClearingBatch(clearingBatchId);
+            return;
+        }
+
+        ReconBatch recon = reconBatchService.createRetryPendingNextAttempt(latest.getId());
+        runLinkedInternal(recon);
+    }
+
+    /**
      * 스케줄 편의용 진입점: 해당 businessDate의 최신 SUCCESS EOD clearing batch를 사용한다.
      */
     public void runMostRecentSuccessClearing(LocalDate businessDate) {
@@ -90,6 +114,23 @@ public class ReconBatchRunner {
             return;
         }
         runForClearingBatch(clearing.getId());
+    }
+
+    public void rerunMostRecentSuccessClearingNewAttempt(LocalDate businessDate) {
+        ClearingBatch clearing = clearingBatchRepository
+                .findTopByBusinessDateAndBatchTypeAndStatusAndScopeOrderByIdDesc(
+                        businessDate,
+                        ClearingBatchType.EOD,
+                        ClearingBatchStatus.SUCCESS,
+                        ""
+                )
+                .orElse(null);
+
+        if (clearing == null) {
+            log.info("[RECON] rerun skipped. no SUCCESS clearing batch found. date={}", businessDate);
+            return;
+        }
+        rerunForClearingBatchNewAttempt(clearing.getId());
     }
 
     /**
@@ -119,6 +160,27 @@ public class ReconBatchRunner {
 
         try {
             // v1에서는 snapshot/truth를 모두 DB 테이블에서 직접 로드한다.
+            List<ReconRow> snapshot = reconInputsPort.loadSnapshot(recon);
+            List<ReconRow> truth = reconInputsPort.loadTruth(recon);
+            List<ReconDiffRow> diffs = reconComparator.compare(recon, truth, snapshot);
+            reconDiffWriter.upsertDiffs(recon, diffs);
+            markSuccessWithSummary(recon, diffs);
+        } catch (Exception e) {
+            reconBatchService.markFailed(recon.getId(), ReconFailureCode.UNEXPECTED_ERROR, summarize(e));
+            throw e;
+        }
+    }
+
+    private void runLinkedInternal(ReconBatch recon) {
+        boolean acquired = reconBatchService.tryMarkRunning(recon.getId());
+        if (!acquired) {
+            log.info("[RECON] linked not acquired. reconBatchId={}", recon.getId());
+            return;
+        }
+
+        recon = reconBatchService.findById(recon.getId());
+
+        try {
             List<ReconRow> snapshot = reconInputsPort.loadSnapshot(recon);
             List<ReconRow> truth = reconInputsPort.loadTruth(recon);
             List<ReconDiffRow> diffs = reconComparator.compare(recon, truth, snapshot);

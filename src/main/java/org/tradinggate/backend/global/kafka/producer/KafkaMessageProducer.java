@@ -8,6 +8,8 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.TimeUnit;
+
 @Log4j2
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,20 @@ public class KafkaMessageProducer {
         } catch (Exception e) {
             log.error("Failed to send Kafka message. topic={}, key={}", topic, key, e);
             throw new RuntimeException("Kafka send failed", e);
+        }
+    }
+
+    /**
+     * API 요청 경로처럼 오래 붙잡히면 안 되는 곳에서 사용한다.
+     * 재시도 없이 지정 시간만 기다렸다가 바로 실패시킨다.
+     */
+    public void sendAndWaitOnce(String topic, String key, String payload, long timeoutMs) {
+        try {
+            kafkaTemplate.send(topic, key, payload).get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.error("Failed to send Kafka message quickly. topic={}, key={}, timeoutMs={}",
+                    topic, key, timeoutMs, e);
+            throw new RuntimeException("Kafka send failed fast", e);
         }
     }
 

@@ -216,6 +216,56 @@ class RiskModuleIntegrationTest {
     assertThat(btcLedger).hasSize(10);
   }
 
+  @Test
+  @DisplayName("통합: 같은 tradeId라도 서로 다른 계정의 maker/taker는 각각 반영된다")
+  void testSameTradeIdDifferentAccountsAreRecordedSeparately() {
+    Long makerAccountId = 4001L;
+    Long takerAccountId = 4002L;
+
+    createBalance(makerAccountId, "BTC", BigDecimal.ZERO);
+    createBalance(makerAccountId, "USDT", BigDecimal.ZERO);
+    createBalance(takerAccountId, "BTC", BigDecimal.ZERO);
+    createBalance(takerAccountId, "USDT", BigDecimal.ZERO);
+
+    TradeExecutedEvent maker = TradeExecutedEvent.builder()
+        .tradeId("TRD-SHARED")
+        .accountId(makerAccountId)
+        .symbol("BTCUSDT")
+        .side("BUY")
+        .quantity(new BigDecimal("1"))
+        .price(new BigDecimal("50000"))
+        .fee(BigDecimal.ZERO)
+        .feeAsset("USDT")
+        .executedAt(LocalDateTime.now())
+        .build();
+
+    TradeExecutedEvent taker = TradeExecutedEvent.builder()
+        .tradeId("TRD-SHARED")
+        .accountId(takerAccountId)
+        .symbol("BTCUSDT")
+        .side("SELL")
+        .quantity(new BigDecimal("1"))
+        .price(new BigDecimal("50000"))
+        .fee(BigDecimal.ZERO)
+        .feeAsset("USDT")
+        .executedAt(LocalDateTime.now())
+        .build();
+
+    assertThat(orchestrator.processTrade(maker)).isTrue();
+    assertThat(orchestrator.processTrade(taker)).isTrue();
+
+    assertBalance(makerAccountId, "BTC", "1");
+    assertBalance(makerAccountId, "USDT", "-50000");
+    assertBalance(takerAccountId, "BTC", "-1");
+    assertBalance(takerAccountId, "USDT", "50000");
+
+    List<LedgerEntry> entries = ledgerRepository.findByTradeId("TRD-SHARED");
+    assertThat(entries).hasSize(4);
+    assertThat(entries).extracting(LedgerEntry::getAccountId).containsExactlyInAnyOrder(
+        makerAccountId, makerAccountId, takerAccountId, takerAccountId
+    );
+  }
+
   private TradeExecutedEvent createBuyEvent(String tradeId, String qty, String price, String fee) {
     return TradeExecutedEvent.builder()
         .tradeId(tradeId)

@@ -10,6 +10,7 @@ public enum TradingErrorCode implements ErrorCode{
   ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
   INVALID_ORDER(HttpStatus.BAD_REQUEST, "유효하지 않은 주문입니다."),
   DUPLICATE_ORDER(HttpStatus.CONFLICT, "중복된 주문입니다."),
+  MESSAGE_BROKER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "메시지 브로커에 연결할 수 없습니다."),
 
   // 리스크 관련
   RISK_BLOCKED(HttpStatus.FORBIDDEN, "리스크 정책에 의해 차단되었습니다."),
