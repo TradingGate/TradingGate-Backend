@@ -263,6 +263,36 @@
 
 ---
 
+## 🚦 런타임 검증 (실 프로필 구동)
+
+이번에는 테스트 코드 외에 실제 프로필을 함께 띄워 런타임 흐름도 확인했다.
+
+- 기동 프로필: `api / worker / risk / clearing`
+- 검증 흐름:
+  - `orders.in` 발행
+  - `worker` 매칭 및 `trades.executed` 발행
+  - `risk`가 `ledger_entry`, `account_balance` 반영
+  - 내부 엔드포인트로 `clearing`, `recon` 수동 실행
+
+### 확인 결과
+
+- `risk` 멱등성 키 수정 후 maker/taker 양 계정이 모두 원장에 기록됨
+- `clearing` 수동 실행 성공
+  - `clearing_batch`: `SUCCESS`
+  - `clearing_result`: 4건 생성
+- `recon linked` 수동 실행 성공
+  - `recon_batch`: `SUCCESS`
+  - `recon_diff`: 0건
+
+### 추가한 검증 보강
+
+- `TradeExecutedConsumerTest`
+  - worker envelope 형식의 `trades.executed` 파싱 검증
+- `RiskModuleIntegrationTest`
+  - 같은 `tradeId`라도 서로 다른 계정(maker/taker)은 각각 반영되는지 검증
+
+---
+
 ## 🐞 테스트로 발견 및 수정한 이슈
 
 ### 1. Clearing invalid scope 예외 처리 누락
@@ -281,6 +311,52 @@
 
 - 운영자가 잘못된 scope로 수동 실행해도 배치 상태가 일관되게 종료됨
 
+### 2. Risk 체결 멱등성 키가 account 단위를 구분하지 못함
+
+**문제**
+
+- `tradeId + asset + entryType` 기준 멱등성으로 인해
+- 같은 체결의 maker/taker 이벤트 중 한쪽 계정만 원장에 반영될 수 있었음
+
+**조치**
+
+- 멱등성 키를 `tradeId + accountId + asset + entryType`으로 변경
+
+**의미**
+
+- 체결 참여자별 원장 기록이 분리되어 `clearing/recon` 입력 데이터가 정상화됨
+
+### 3. Risk가 worker의 `trades.executed` envelope 형식을 직접 처리하지 못함
+
+**문제**
+
+- `TradeExecutedConsumer`가 flat DTO만 기대하고 있어 런타임에서 validation error가 발생했음
+
+**조치**
+
+- nested `body` envelope를 파싱하도록 consumer 로직 보강
+
+**의미**
+
+- 실제 `worker -> risk` 경로를 테스트가 아닌 런타임에서도 그대로 검증 가능해짐
+
+### 4. `CLEARING.SETTLEMENT` outbox가 런타임에서 발행되지 않음
+
+**문제**
+
+- `outbox.topics`에 `CLEARING.SETTLEMENT` 매핑이 없었고,
+- `OutboxProperties`가 `Map<String, ...>`로 선언되어 있어 enum key(`CLEARING`) 바인딩 후 조회도 맞지 않았음
+
+**조치**
+
+- `application.yml`에 `outbox.topics.CLEARING."CLEARING.SETTLEMENT" = clearing.settlement` 추가
+- `OutboxProperties`의 토픽 맵을 `Map<OutboxProducerType, Map<String, String>>`로 수정
+
+**의미**
+
+- `clearing_result -> outbox_event -> Kafka(clearing.settlement)` 경로가 실제 런타임에서 복구됨
+- 검증 시점 기준 `outbox_event`는 `SENT=1954`까지 정상 반영됨
+
 ---
 
 ## 📈 테스트 커버리지 관점 (정성 평가)
@@ -296,6 +372,8 @@
 - recon stale diff 잔존
 - standalone 재실행/날짜 분리 혼선
 - 정책 분기(SKIP / skip semantics)
+- 실제 프로필 간 메시지 포맷 불일치
+- 같은 체결의 양 계정 반영 누락
 
 즉, 단순 라인 커버리지보다 **실무에서 사고로 이어질 수 있는 경계 조건**을 우선 커버했습니다.
 
@@ -328,6 +406,26 @@
   --tests org.tradinggate.backend.recon.service.ReconBatchRunnerIntegrationTest
 ```
 
+### 부하 테스트 (k6 / 운영 런타임)
+
+- API Smoke: `5 VUs / 1m`, 성공률 `100%`, `p95 25.69ms`
+- API Ramp: `최대 50 VUs / 6m`, 성공률 `99.99%`, `p95 21.07ms`, `217.25 req/s`
+- API Soak: `10 VUs / 10m`, 성공률 `99.99%`, `p95 15.68ms`, `88.41 req/s`
+- Kafka Burst: `1000 orders`, ledger 기준 `500 distinct trade_id`, `1948 ledger rows`
+- Clearing / Recon 수동 벤치마크: `314ms / 191ms`
+
+### 장애 / 복구 테스트 (Kafka)
+
+- Kafka 중단 시:
+  - `api` producer, `worker/risk` consumer 모두 `localhost:9092` 연결 실패 로그 확인
+  - `api` 주문 요청은 즉시 실패하지 않고 약 `67초` 대기 후 `202`로 복구됨
+- API producer fail-fast 설정 적용 후 재검증:
+  - Kafka 중단 시 주문 요청은 `503 / 3.48s`로 빠르게 실패
+  - Kafka 복구 후 신규 주문 요청은 `202 / 0.41s`로 정상 회복
+- Kafka 재기동 후:
+  - `worker`, `risk`가 coordinator 재발견
+  - 신규 주문 요청은 `202 / 116ms`로 정상 회복
+
 ---
 
 ## 🎯 결론
@@ -341,4 +439,3 @@
 - DB 기반 정산/대사로의 전환과 재현 가능성 확보
 
 MVP 범위에서 필요한 정합성 코어는 충분히 확보되었으며, 이후 확장은 이 기반 위에서 진행할 수 있습니다.
-

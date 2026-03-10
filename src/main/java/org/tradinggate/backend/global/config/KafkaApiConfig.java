@@ -29,7 +29,10 @@ public class KafkaApiConfig {
   // ==========================
   @Bean
   public ProducerFactory<String, String> producerFactory(
-      @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
+      @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
+      @Value("${spring.kafka.producer.properties.max.block.ms:3000}") int maxBlockMs,
+      @Value("${spring.kafka.producer.request-timeout-ms:3000}") int requestTimeoutMs,
+      @Value("${spring.kafka.producer.delivery-timeout-ms:5000}") int deliveryTimeoutMs) {
 
     Map<String, Object> props = new HashMap<>();
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -43,8 +46,10 @@ public class KafkaApiConfig {
     props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 1);
 
     // 타임아웃 설정
-    props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
-    props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 120000);
+    // API는 Kafka 장애 시 요청을 오래 붙잡지 않도록 fail-fast 쪽으로 둔다.
+    props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMs);
+    props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
+    props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, deliveryTimeoutMs);
 
     return new DefaultKafkaProducerFactory<>(props);
   }

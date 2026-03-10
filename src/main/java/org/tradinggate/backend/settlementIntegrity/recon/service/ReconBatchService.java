@@ -18,7 +18,7 @@ import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
-@Profile("recon")
+@Profile("clearing")
 public class ReconBatchService {
 
     public static final ReconRetryPolicyType RETRY_POLICY = ReconRetryPolicyType.REUSE_SAME_ATTEMPT_OVERWRITE_DIFFS;

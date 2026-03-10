@@ -37,7 +37,16 @@ public class ClearingBatchRunner {
      * 생성/조회 -> 정책 판단 -> 워터마크 선점 -> 계산/저장 -> 아웃박스 적재 -> 성공/실패 마킹
      */
     public void run(LocalDate businessDate, ClearingBatchType batchType, String scope, ClearingBatchTriggerPolicy policy) {
-        ClearingBatch batch = clearingBatchService.getOrCreatePending(businessDate, batchType, scope);
+        run(businessDate, batchType, scope, policy, null);
+    }
+
+    /**
+     * 성능 측정이나 수동 재실행처럼 같은 날짜/타입에 대해 새 실행 키가 필요한 경우를 위한 진입점.
+     */
+    public void run(LocalDate businessDate, ClearingBatchType batchType, String scope, ClearingBatchTriggerPolicy policy, String runKey) {
+        ClearingBatch batch = (runKey == null || runKey.isBlank())
+                ? clearingBatchService.getOrCreatePending(businessDate, batchType, scope)
+                : clearingBatchService.getOrCreatePending(businessDate, batchType, runKey, 1, scope);
 
         ClearingBatchStatus status = batch.getStatus();
         ClearingTriggerDecision decision = policy.decide(status);

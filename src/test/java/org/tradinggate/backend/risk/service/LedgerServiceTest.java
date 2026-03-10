@@ -147,6 +147,37 @@ class LedgerServiceTest {
   }
 
   @Test
+  @DisplayName("같은 tradeId라도 계정이 다르면 각각 원장 기록 가능")
+  void testRecordTrade_AllowsSameTradeForDifferentAccounts() {
+    when(ledgerRepository.existsByIdempotencyKey(anyString())).thenReturn(false);
+    when(ledgerRepository.save(any(LedgerEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    boolean makerRecorded = ledgerService.recordTrade(
+        "TRD-SHARED",
+        1001L,
+        "BTC",
+        new BigDecimal("1"),
+        "USDT",
+        new BigDecimal("-50000"),
+        BigDecimal.ZERO,
+        "USDT");
+
+    boolean takerRecorded = ledgerService.recordTrade(
+        "TRD-SHARED",
+        1002L,
+        "BTC",
+        new BigDecimal("-1"),
+        "USDT",
+        new BigDecimal("50000"),
+        BigDecimal.ZERO,
+        "USDT");
+
+    assertThat(makerRecorded).isTrue();
+    assertThat(takerRecorded).isTrue();
+    verify(ledgerRepository, times(4)).save(any());
+  }
+
+  @Test
   @DisplayName("특정 계정 자산 조회")
   void testFindByAccountIdAndAsset() {
     // Given

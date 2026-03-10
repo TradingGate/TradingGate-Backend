@@ -1,6 +1,7 @@
 package org.tradinggate.backend.risk.kafka.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -14,6 +15,8 @@ import org.tradinggate.backend.risk.kafka.dto.TradeExecutedEvent;
 import org.tradinggate.backend.risk.service.orchestrator.TradeProcessingOrchestrator;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 체결 이벤트 Kafka Consumer (B 모듈 진입점)
@@ -57,8 +60,7 @@ public class TradeExecutedConsumer {
     log.debug("Message: {}", message);
 
     try {
-      // JSON → TradeExecutedEvent 변환
-      TradeExecutedEvent event = objectMapper.readValue(message, TradeExecutedEvent.class);
+      TradeExecutedEvent event = parseEvent(message);
 
       // 이벤트 검증
       validateEvent(event);
@@ -98,6 +100,27 @@ public class TradeExecutedConsumer {
     }
   }
 
+  private TradeExecutedEvent parseEvent(String message) throws com.fasterxml.jackson.core.JsonProcessingException {
+    JsonNode root = objectMapper.readTree(message);
+
+    if (root.hasNonNull("body")) {
+      JsonNode body = root.get("body");
+      return TradeExecutedEvent.builder()
+          .tradeId(text(body, "tradeId"))
+          .accountId(longValue(body, "userId"))
+          .symbol(text(body, "symbol"))
+          .side(text(body, "side"))
+          .quantity(decimal(body, "execQuantity"))
+          .price(decimal(body, "execPrice"))
+          .fee(decimalOrDefault(body, "fee", BigDecimal.ZERO))
+          .feeAsset(textOrNull(body, "feeAsset"))
+          .executedAt(dateTime(body, "execTime"))
+          .build();
+    }
+
+    return objectMapper.treeToValue(root, TradeExecutedEvent.class);
+  }
+
   /**
    * 이벤트 검증
    */
@@ -123,5 +146,37 @@ public class TradeExecutedConsumer {
     if (event.getPrice() == null || event.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("price must be positive");
     }
+  }
+
+  private String text(JsonNode node, String field) {
+    JsonNode value = node.get(field);
+    return value == null || value.isNull() ? null : value.asText();
+  }
+
+  private String textOrNull(JsonNode node, String field) {
+    return text(node, field);
+  }
+
+  private Long longValue(JsonNode node, String field) {
+    JsonNode value = node.get(field);
+    return value == null || value.isNull() ? null : value.asLong();
+  }
+
+  private BigDecimal decimal(JsonNode node, String field) {
+    String raw = text(node, field);
+    return raw == null || raw.isBlank() ? null : new BigDecimal(raw);
+  }
+
+  private BigDecimal decimalOrDefault(JsonNode node, String field, BigDecimal defaultValue) {
+    BigDecimal value = decimal(node, field);
+    return value == null ? defaultValue : value;
+  }
+
+  private LocalDateTime dateTime(JsonNode node, String field) {
+    String raw = text(node, field);
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    return OffsetDateTime.parse(raw).toLocalDateTime();
   }
 }

@@ -48,7 +48,7 @@ public class LedgerEntryRepositoryTest {
                 .amount(new BigDecimal("0.5"))
                 .entryType(EntryType.TRADE)
                 .tradeId("T-001")
-                .idempotencyKey("T-001:BTC:TRADE")
+                .idempotencyKey("T-001:5000:BTC:TRADE")
                 .build();
 
         // When
@@ -103,7 +103,7 @@ public class LedgerEntryRepositoryTest {
     @DisplayName("Repository: 멱등성 키 중복 방지")
     void testIdempotencyKeyUnique() {
         // Given
-        String idempotencyKey = "T-DUP:BTC:TRADE";
+        String idempotencyKey = "T-DUP:5000:BTC:TRADE";
         LedgerEntry first = LedgerEntry.builder()
                 .accountId(ACCOUNT_ID)
                 .asset("BTC")
@@ -235,7 +235,7 @@ public class LedgerEntryRepositoryTest {
                 .amount(new BigDecimal(amount))
                 .entryType(entryType)
                 .tradeId(tradeId)
-                .idempotencyKey(LedgerEntry.generateIdempotencyKey(tradeId, asset, entryType))
+                .idempotencyKey(LedgerEntry.generateIdempotencyKey(tradeId, accountId, asset, entryType))
                 .build();
         ledgerRepository.save(entry);
 

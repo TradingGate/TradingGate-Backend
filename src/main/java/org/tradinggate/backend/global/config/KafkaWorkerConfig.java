@@ -1,8 +1,6 @@
 package org.tradinggate.backend.global.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -19,17 +17,8 @@ import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.util.backoff.FixedBackOff;
-import org.tradinggate.backend.matching.engine.kafka.PartitionCountProvider;
 import org.tradinggate.backend.matching.engine.kafka.SnapshotRecoveryOnAssign;
-import org.tradinggate.backend.matching.engine.model.OrderBookRegistry;
 import org.tradinggate.backend.matching.engine.util.MatchingProperties;
-import org.tradinggate.backend.matching.snapshot.SnapshotCoordinator;
-import org.tradinggate.backend.matching.snapshot.io.SnapshotPathResolver;
-import org.tradinggate.backend.matching.snapshot.restore.PartitionStateService;
-import org.tradinggate.backend.matching.snapshot.restore.SnapshotLoader;
-import org.tradinggate.backend.matching.snapshot.shutdown.AssignedPartitionTracker;
-import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
-import org.tradinggate.backend.matching.snapshot.util.SnapshotRestorer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,13 +33,10 @@ import java.util.Map;
 @EnableKafka
 @EnableRetry
 @EnableConfigurationProperties(MatchingProperties.class)
-@RequiredArgsConstructor
 public class KafkaWorkerConfig {
 
   @Value("${spring.kafka.consumer.group-id}")
   private String groupId;
-
-  private final MatchingProperties matchingProperties;
 
   // ==========================
   // Consumer Factory
@@ -120,43 +106,5 @@ public class KafkaWorkerConfig {
   @Bean
   public KafkaTemplate<String, String> kafkaTemplate(ProducerFactory<String, String> pf) {
     return new KafkaTemplate<>(pf);
-  }
-
-  // ==========================
-  // Snapshot Recovery 관련 Bean (Worker 전용)
-  // ==========================
-  @Bean
-  public SnapshotRecoveryOnAssign snapshotRecoveryOnAssign(
-      PartitionStateService partitionStateService,
-      AssignedPartitionTracker tracker,
-      @Value("${tradinggate.matching.orders-in-topic}") String topic
-  ) {
-    return new SnapshotRecoveryOnAssign(partitionStateService, tracker, topic);
-  }
-
-  @Bean
-  public PartitionStateService partitionStateService(
-      ObjectMapper objectMapper,
-      OrderBookRegistry registry,
-      PartitionCountProvider partitionCountProvider,
-      SnapshotCoordinator snapshotCoordinator,
-      PartitionOffsetTracker tracker
-  ) {
-    SnapshotPathResolver pathResolver = new SnapshotPathResolver(matchingProperties.getBaseDir());
-    SnapshotLoader snapshotLoader = new SnapshotLoader(
-        pathResolver,
-        objectMapper,
-        matchingProperties.getFallbackCount()
-    );
-    SnapshotRestorer snapshotRestorer = new SnapshotRestorer();
-
-    return new PartitionStateService(
-        snapshotLoader,
-        snapshotRestorer,
-        registry,
-        partitionCountProvider,
-        snapshotCoordinator,
-        tracker
-    );
   }
 }

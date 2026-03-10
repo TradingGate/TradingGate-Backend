@@ -63,6 +63,14 @@ public class LedgerEntry {
     }
   }
 
+  public static String generateIdempotencyKey(
+      String tradeId,
+      Long accountId,
+      String asset,
+      EntryType entryType) {
+    return String.format("%s:%s:%s:%s", tradeId, accountId, asset, entryType);
+  }
+
   public static String generateIdempotencyKey(String tradeId, String asset, EntryType entryType) {
     return String.format("%s:%s:%s", tradeId, asset, entryType);
   }

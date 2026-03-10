@@ -13,7 +13,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
-@Profile("recon")
+@Profile("clearing")
 public class ReconDiffWriter {
 
     private final JdbcTemplate jdbcTemplate;

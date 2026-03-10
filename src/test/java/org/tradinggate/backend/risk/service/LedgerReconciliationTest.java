@@ -95,11 +95,11 @@ public class LedgerReconciliationTest {
         // Given: BTC 매수 + USDT 수수료
         String tradeId = "T-FEE-001";
         ledgerService.recordEntry(ACCOUNT_ID, "BTC", new BigDecimal("0.1"), EntryType.TRADE, tradeId,
-                LedgerEntry.generateIdempotencyKey(tradeId, "BTC", EntryType.TRADE));
+                LedgerEntry.generateIdempotencyKey(tradeId, ACCOUNT_ID, "BTC", EntryType.TRADE));
         ledgerService.recordEntry(ACCOUNT_ID, "USDT", new BigDecimal("-5000"), EntryType.TRADE, tradeId,
-                LedgerEntry.generateIdempotencyKey(tradeId, "USDT", EntryType.TRADE));
+                LedgerEntry.generateIdempotencyKey(tradeId, ACCOUNT_ID, "USDT", EntryType.TRADE));
         ledgerService.recordEntry(ACCOUNT_ID, "USDT", new BigDecimal("-5"), EntryType.FEE, tradeId,
-                LedgerEntry.generateIdempotencyKey(tradeId, "USDT", EntryType.FEE));
+                LedgerEntry.generateIdempotencyKey(tradeId, ACCOUNT_ID, "USDT", EntryType.FEE));
 
         // Balance 업데이트
         Map<String, BigDecimal> changes = new HashMap<>();
@@ -118,7 +118,7 @@ public class LedgerReconciliationTest {
         // Given: 원장만 기록, 잔고 업데이트 누락
         String tradeId = "T-MISSING";
         ledgerService.recordEntry(ACCOUNT_ID, "BNB", new BigDecimal("100"), EntryType.TRADE, tradeId,
-                LedgerEntry.generateIdempotencyKey(tradeId, "BNB", EntryType.TRADE));
+                LedgerEntry.generateIdempotencyKey(tradeId, ACCOUNT_ID, "BNB", EntryType.TRADE));
 
         // When
         BigDecimal ledgerSum = calculateLedgerSum(ACCOUNT_ID, "BNB");
@@ -135,7 +135,7 @@ public class LedgerReconciliationTest {
     void testReconciliation_DuplicatePrevention() {
         // Given
         String tradeId = "T-DUP";
-        String idempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, "SOL", EntryType.TRADE);
+        String idempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, ACCOUNT_ID, "SOL", EntryType.TRADE);
 
         // When: 같은 키로 2회 기록 시도
         LedgerEntry first = ledgerService.recordEntry(ACCOUNT_ID, "SOL", new BigDecimal("50"),
@@ -198,7 +198,7 @@ public class LedgerReconciliationTest {
     // === Helper Methods ===
 
     private void recordTrade(String tradeId, Long accountId, String asset, String amount) {
-        String idempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, asset, EntryType.TRADE);
+        String idempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, accountId, asset, EntryType.TRADE);
         ledgerService.recordEntry(accountId, asset, new BigDecimal(amount), EntryType.TRADE, tradeId, idempotencyKey);
         balanceService.updateBalance(accountId, asset, new BigDecimal(amount));
     }

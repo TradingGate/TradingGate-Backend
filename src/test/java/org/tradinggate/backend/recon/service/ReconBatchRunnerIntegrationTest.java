@@ -47,7 +47,7 @@ import static org.mockito.Mockito.when;
         properties = "spring.index.ignore=true"
 )
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles({"test", "recon"})
+@ActiveProfiles({"test", "clearing"})
 class ReconBatchRunnerIntegrationTest extends PostgresTcBase {
 
     @Autowired

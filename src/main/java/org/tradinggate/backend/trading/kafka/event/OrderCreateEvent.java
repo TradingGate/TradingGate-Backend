@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import org.tradinggate.backend.trading.domain.entity.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * orders.in 토픽 - 신규 주문 이벤트 (PDF 스키마 기준)
@@ -61,7 +61,7 @@ public class OrderCreateEvent {
   private SourceType source;
 
   @JsonProperty("receivedAt")
-  private LocalDateTime receivedAt;
+  private Instant receivedAt;
 
   /**
    * Order Entity -> OrderEvent 변환 (PDF 스키마)
@@ -78,7 +78,7 @@ public class OrderCreateEvent {
         .price(order.getPrice())
         .quantity(order.getQuantity())
         .source(sourceType)
-        .receivedAt(LocalDateTime.now())
+        .receivedAt(Instant.now())
         .build();
   }
 

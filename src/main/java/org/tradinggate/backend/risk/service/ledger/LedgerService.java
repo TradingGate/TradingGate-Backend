@@ -54,18 +54,22 @@ public class LedgerService {
     quoteAsset = normalizeAsset(quoteAsset);
     feeAsset = normalizeAsset(feeAsset);
     // 1. Base asset 변동 기록
-    String baseIdempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, baseAsset, EntryType.TRADE);
+    // 같은 tradeId라도 maker/taker 계정은 각각 별도 원장으로 처리되어야 한다.
+    String baseIdempotencyKey =
+        LedgerEntry.generateIdempotencyKey(tradeId, accountId, baseAsset, EntryType.TRADE);
     LedgerEntry baseEntry = recordEntry(accountId, baseAsset, baseAmount, EntryType.TRADE, tradeId, baseIdempotencyKey);
     if (baseEntry == null) {
       log.debug("Trade {} already recorded (idempotency key: {})", tradeId, baseIdempotencyKey);
       return false; // 중복
     }
     // 2. Quote asset 변동 기록
-    String quoteIdempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, quoteAsset, EntryType.TRADE);
+    String quoteIdempotencyKey =
+        LedgerEntry.generateIdempotencyKey(tradeId, accountId, quoteAsset, EntryType.TRADE);
     recordEntry(accountId, quoteAsset, quoteAmount, EntryType.TRADE, tradeId, quoteIdempotencyKey);
     // 3. 수수료 기록 (fee > 0인 경우만)
     if (fee.compareTo(BigDecimal.ZERO) > 0) {
-      String feeIdempotencyKey = LedgerEntry.generateIdempotencyKey(tradeId, feeAsset, EntryType.FEE);
+      String feeIdempotencyKey =
+          LedgerEntry.generateIdempotencyKey(tradeId, accountId, feeAsset, EntryType.FEE);
       recordEntry(accountId, feeAsset, fee.negate(), EntryType.FEE, tradeId, feeIdempotencyKey);
     }
     return true; // 정상 처리

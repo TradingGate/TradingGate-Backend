@@ -28,7 +28,7 @@ public class OutboxProperties {
      */
     private long pollIntervalMs = 200;
 
-    private Map<String, Map<String, String>> topics = new HashMap<>();
+    private Map<OutboxProducerType, Map<String, String>> topics = new HashMap<>();
 
     public String resolveTopic(OutboxProducerType producerType, String eventType) {
         Map<String, String> byProducer = topics.get(producerType);

@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @Primary
 @Component
 @RequiredArgsConstructor
-@Profile("recon")
+@Profile("clearing")
 public class DbReconInputsPort implements ReconInputsPort {
 
     private final AccountBalanceRepository accountBalanceRepository;

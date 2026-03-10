@@ -72,6 +72,9 @@ outbox:
   max-retries: 10
   poll-interval-ms: 200
   monitor-interval-ms: 5000
+  topics:
+    CLEARING:
+      "CLEARING.SETTLEMENT": clearing.settlement
 
 
 # ============================================
@@ -106,6 +109,11 @@ spring:
   kafka:
     consumer:
       group-id: trading-api
+    producer:
+      properties:
+        max.block.ms: 3000
+      delivery-timeout-ms: 5000
+      request-timeout-ms: 3000
 
 server:
   port: ${API_PORT:8080}
@@ -116,6 +124,8 @@ tradinggate:
     orders-in: orders.in
     orders-updated: orders.updated
     trades-executed: trades.executed
+  kafka:
+    api-send-timeout-ms: 3000
 
 
 # ============================================
@@ -199,11 +209,6 @@ tradinggate:
     anomaly-detection:
       enabled: false
 
-    # 대사 스케줄 (매일 01:00)
-    reconciliation:
-      enabled: true
-      cron: "0 0 1 * * *"
-
 # Logging
 logging:
   level:
@@ -236,6 +241,9 @@ tradinggate:
   topics:
     trades-executed: trades.executed
     clearing-settlement: clearing.settlement
+  recon:
+    enabled: true
+    cron: "0 */10 * * * *"
 
 settlement:
   policy:

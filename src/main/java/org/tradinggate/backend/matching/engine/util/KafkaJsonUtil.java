@@ -12,6 +12,8 @@ import org.tradinggate.backend.matching.engine.model.e.TimeInForce;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,7 +28,7 @@ public class KafkaJsonUtil {
         long accountId = getRequiredLong(root, "userId");
         String symbol = getRequiredText(root, "symbol");
         String source = getOptionalText(root, "source", "UNKNOWN");
-        Instant receivedAt = Instant.parse(getOptionalText(root, "receivedAt", Instant.now().toString()));
+        Instant receivedAt = parseInstant(getOptionalText(root, "receivedAt", Instant.now().toString()));
 
         if (commandType == CommandType.NEW) {
             String clientOrderId = getRequiredText(root, "clientOrderId");
@@ -101,6 +103,15 @@ public class KafkaJsonUtil {
             throw new IllegalArgumentException("Missing required long field: " + fieldName);
         }
         return valueNode.asLong();
+    }
+
+    private static Instant parseInstant(String raw) {
+        try {
+            return Instant.parse(raw);
+        } catch (Exception ignored) {
+            LocalDateTime localDateTime = LocalDateTime.parse(raw);
+            return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+        }
     }
 
     public static Map<String, Object> buildTakerPayload(MatchFill fill,
