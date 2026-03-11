@@ -17,6 +17,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
   Optional<Order> findByClientOrderId(String clientOrderId);
 
+  Optional<Order> findByOrderId(Long orderId);
+
   // 사용자별 주문 조회 (Slice 페이징)
   Slice<Order> findByUserId(Long userId, Pageable pageable);
 

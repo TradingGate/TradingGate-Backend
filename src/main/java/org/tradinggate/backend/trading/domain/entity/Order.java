@@ -131,6 +131,44 @@ public class Order {
         .build();
   }
 
+  public static Order createProjection(
+      Long orderId,
+      Long userId,
+      String clientOrderId,
+      String symbol,
+      OrderSide orderSide,
+      OrderType orderType,
+      TimeInForce timeInForce,
+      BigDecimal price,
+      BigDecimal quantity,
+      BigDecimal filledQuantity,
+      BigDecimal remainingQuantity,
+      BigDecimal avgFilledPrice,
+      OrderStatus status,
+      String rejectReason,
+      Long eventSeq,
+      LocalDateTime eventTime
+  ) {
+    return Order.builder()
+        .orderId(orderId)
+        .clientOrderId(clientOrderId)
+        .userId(userId)
+        .symbol(symbol)
+        .orderSide(orderSide)
+        .orderType(orderType)
+        .timeInForce(timeInForce)
+        .price(price)
+        .quantity(quantity)
+        .filledQuantity(filledQuantity)
+        .remainingQuantity(remainingQuantity)
+        .avgFilledPrice(avgFilledPrice)
+        .status(status)
+        .rejectReason(rejectReason)
+        .lastEventSeq(eventSeq)
+        .lastEventTime(eventTime)
+        .build();
+  }
+
   // =====================================
   // 도메인 메서드 (상태 변경 책임)
   // =====================================
@@ -212,6 +250,36 @@ public class Order {
 
     // 중복/순서 위반 이벤트 무시
     return false;
+  }
+
+  public void applyProjectionUpdate(
+      Long orderId,
+      String symbol,
+      OrderSide orderSide,
+      OrderType orderType,
+      TimeInForce timeInForce,
+      BigDecimal price,
+      BigDecimal quantity,
+      BigDecimal filledQuantity,
+      BigDecimal remainingQuantity,
+      BigDecimal avgFilledPrice,
+      OrderStatus status,
+      String rejectReason,
+      LocalDateTime eventTime
+  ) {
+    this.orderId = orderId;
+    this.symbol = symbol;
+    this.orderSide = orderSide;
+    this.orderType = orderType;
+    this.timeInForce = timeInForce;
+    this.price = price;
+    this.quantity = quantity;
+    this.filledQuantity = filledQuantity;
+    this.remainingQuantity = remainingQuantity;
+    this.avgFilledPrice = avgFilledPrice;
+    this.status = status;
+    this.rejectReason = rejectReason;
+    this.updatedAt = eventTime;
   }
 
   // =====================================

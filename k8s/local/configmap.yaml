@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tradinggate-app-config
+  namespace: tradinggate
+data:
+  TZ: Asia/Seoul
+  SPRING_PROFILES_ACTIVE: api
+  SERVER_PORT: "8080"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: none
+  KAFKA_BROKER_HOST: host.docker.internal
+  KAFKA_BROKER_PORT: "9092"
+  REDIS_HOST: host.docker.internal
+  REDIS_PORT: "6379"
+  SPRING_DATA_REDIS_HOST: host.docker.internal
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_REDIS_HOST: host.docker.internal
+  SPRING_REDIS_PORT: "6379"
+  TRADING_DB_HOST: host.docker.internal
+  TRADING_DB_PORT: "5432"
+  TRADING_DB_NAME: trading_db
+  LEDGER_DB_HOST: host.docker.internal
+  LEDGER_DB_PORT: "5433"
+  LEDGER_DB_NAME: ledger_db
+  APP_PORT: "8080"
+  API_PORT: "8080"
