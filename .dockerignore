@@ -1,0 +1,11 @@
+.git
+.gitignore
+.gradle
+build
+out
+.idea
+.vscode
+loadtest/data
+loadtest/results
+*.log
+k8s/local/secret.yaml

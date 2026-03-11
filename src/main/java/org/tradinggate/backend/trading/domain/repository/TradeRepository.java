@@ -21,7 +21,11 @@ import java.util.Optional;
 
 public interface TradeRepository extends JpaRepository<Trade, Long> {
 
+  Optional<Trade> findByEventId(String eventId);
+
   Optional<Trade> findByTradeId(Long tradeId);
+
+  Optional<Trade> findByTradeIdAndUserId(Long tradeId, Long userId);
 
   Page<Trade> findByUserId(Long userId, Pageable pageable);
 

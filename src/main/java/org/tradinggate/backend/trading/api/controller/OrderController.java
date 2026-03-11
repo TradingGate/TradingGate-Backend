@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.tradinggate.backend.global.common.CommonResponse;
@@ -37,17 +38,18 @@ public class OrderController {
   /** 신규 주문 생성 */
   @PostMapping("/create")
   public ResponseEntity<CommonResponse<OrderService.OrderCreateResponse>> createOrder(
-      @Valid @RequestBody OrderCreateRequest request
+      @Valid @RequestBody OrderCreateRequest request,
+      @RequestHeader(value = "X-User-Id", required = false) Long userId
       //@AuthenticationPrincipal Long userId
       ) {
 
-    // ✅ 테스트용 userId 하드코딩 (나중에 JWT에서 추출)
-    Long userId = 1L;
+    // JWT 연결 전까지는 헤더 기반 검증을 허용하고, 없으면 기존 테스트 사용자로 동작시킨다.
+    Long resolvedUserId = userId != null ? userId : 1L;
 
     log.info("Received order creation request: userId={}, clientOrderId={}",
-        userId, request.getClientOrderId());
+        resolvedUserId, request.getClientOrderId());
 
-    OrderService.OrderCreateResponse response = orderService.createOrder(request, userId);
+    OrderService.OrderCreateResponse response = orderService.createOrder(request, resolvedUserId);
 
     return ResponseEntity
         .status(HttpStatus.ACCEPTED) // 202
@@ -57,15 +59,15 @@ public class OrderController {
   /** 주문 취소 */
   @PostMapping("/cancel")
   public ResponseEntity<CommonResponse<OrderService.OrderCancelResponse>> cancelOrder(
-      @Valid @RequestBody OrderCancelRequest request) {
+      @Valid @RequestBody OrderCancelRequest request,
+      @RequestHeader(value = "X-User-Id", required = false) Long userId) {
 
-    // ✅ 테스트용 userId 하드코딩
-    Long userId = 1L;
+    Long resolvedUserId = userId != null ? userId : 1L;
 
     log.info("Received order cancel request: userId={}, clientOrderId={}",
-        userId, request.getClientOrderId());
+        resolvedUserId, request.getClientOrderId());
 
-    OrderService.OrderCancelResponse response = orderService.cancelOrder(request, userId);
+    OrderService.OrderCancelResponse response = orderService.cancelOrder(request, resolvedUserId);
 
     return ResponseEntity
         .status(HttpStatus.ACCEPTED) // 202

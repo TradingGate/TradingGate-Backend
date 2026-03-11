@@ -258,6 +258,37 @@
 3. standalone manual rerun(new attempt) 경로
 4. precision normalization 오탐 방지
 5. 날짜별 standalone batch 분리 생성
+
+---
+
+## 🚀 런타임 / 배포 검증 추가 결과
+
+### 1. 프로필 통합 런타임 검증
+
+- `api / worker / risk / clearing` 4개 프로필을 동시에 기동해 실제 흐름을 확인했다.
+- 주문 생성 -> 체결 이벤트 -> `ledger_entry` / `account_balance` -> `clearing` -> `recon` 경로를 검증했다.
+
+### 2. local-all Kubernetes 데모 검증
+
+- `k8s/local-all`에서 앱과 인프라를 모두 올린 뒤 전체 흐름을 재확인했다.
+- `api`, `worker`, `projection`, `risk`, `clearing` 모두 정상 기동 상태에서 다음을 확인했다.
+  - `trading_order` 상태가 `FILLED`로 반영됨
+  - `trading_trade`가 `event_id` 기준으로 저장됨
+  - `ledger_entry`, `account_balance`가 양 계정 기준으로 갱신됨
+- 참고: 현재 매칭 엔진은 정수 수량 기준으로만 안전하므로 최종 검증은 `quantity=1` 기준으로 수행했다.
+
+### 3. 이번 런타임 검증에서 반영한 추가 수정
+
+- `OrderController`에 `X-User-Id` 헤더 지원 추가
+- Trading Projection 추가
+  - `orders.updated` -> `trading_order`
+  - `trades.executed` -> `trading_trade`
+- Projection lookup 안정화
+  - 주문: `userId + clientOrderId` 우선
+  - 체결: `eventId` 멱등성 사용
+- 로컬 K8s 데모용 설정 보강
+  - `startupProbe` 추가
+  - `SPRING_JPA_HIBERNATE_DDL_AUTO=none` 적용
 6. `runMostRecentSuccessClearing` fallback -> standalone
 7. `runForClearingBatch` non-success clearing -> skip
 

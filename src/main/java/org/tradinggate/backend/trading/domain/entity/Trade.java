@@ -18,9 +18,11 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "trading_trade", indexes = {
-    @Index(name = "idx_trade_id", columnList = "trade_id", unique = true),
+    @Index(name = "idx_trade_id", columnList = "trade_id"),
     @Index(name = "idx_trading_trade_order_id", columnList = "order_id"),
     @Index(name = "idx_user_exec_time", columnList = "user_id, exec_time DESC")
+}, uniqueConstraints = {
+    @UniqueConstraint(name = "uk_trading_trade_trade_user", columnNames = {"trade_id", "user_id"})
 })
 
 @Getter
@@ -32,7 +34,12 @@ public class Trade extends Timestamped {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(name = "trade_id", nullable = false, unique = true)
+  // 기존 trading_trade 데이터와 호환되도록 null을 허용하고,
+  // 새 projection 이벤트부터 eventId를 채워 멱등성 키로 사용한다.
+  @Column(name = "event_id", unique = true, length = 100)
+  private String eventId;
+
+  @Column(name = "trade_id", nullable = false)
   private Long tradeId;
 
   @Column(name = "match_id", nullable = false)
@@ -95,6 +102,7 @@ public class Trade extends Timestamped {
    * @return Trade 인스턴스
    */
   public static Trade create(
+      String eventId,
       Long tradeId,
       Long matchId,
       Long orderId,
@@ -112,6 +120,7 @@ public class Trade extends Timestamped {
 
     return new Trade(
         null, // id는 DB에서 자동 생성
+        eventId,
         tradeId,
         matchId,
         orderId,
