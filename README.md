@@ -16,10 +16,11 @@ TradingGate Backend는 주문 접수, 매칭, 원장 기록, 잔고 Projection, 
 
 ### 1. 트레이딩 코어의 역할 분리
 
-시스템은 크게 네 역할로 분리된다.
+시스템은 런타임 기준으로 다섯 역할로 분리된다.
 
 - `api`: 주문 요청을 받아 Kafka로 전달
 - `worker`: 주문을 소비하고 매칭 수행
+- `projection`: 주문/체결 이벤트를 `trading_order`, `trading_trade`에 반영
 - `risk`: 체결 이벤트를 원장과 잔고로 정규화
 - `clearing`: 정산, 대사, outbox 후처리 담당
 
