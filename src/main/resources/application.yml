@@ -64,6 +64,19 @@ logging:
     org.hibernate.type.descriptor.sql: TRACE
 
 
+# ==========================
+# outbox
+# ==========================
+outbox:
+  batch-size: 200
+  max-retries: 10
+  poll-interval-ms: 200
+  monitor-interval-ms: 5000
+  topics:
+    CLEARING:
+      "CLEARING.SETTLEMENT": clearing.settlement
+
+
 # ============================================
 #  Profile: local
 # ============================================
@@ -96,6 +109,11 @@ spring:
   kafka:
     consumer:
       group-id: trading-api
+    producer:
+      properties:
+        max.block.ms: 3000
+      delivery-timeout-ms: 5000
+      request-timeout-ms: 3000
 
 server:
   port: ${API_PORT:8080}
@@ -106,6 +124,8 @@ tradinggate:
     orders-in: orders.in
     orders-updated: orders.updated
     trades-executed: trades.executed
+  kafka:
+    api-send-timeout-ms: 3000
 
 
 # ============================================
@@ -136,6 +156,15 @@ tradinggate:
     orders-updated-topic: orders.updated
     risk-commands-topic: risk.commands
     partitioning-key: symbol
+    orders-in-partitions: 12
+    base-dir: ${TRADINGGATE_SNAPSHOT_BASE_DIR:/data/tradinggate}
+    fallback-count: 5
+  kafka:
+    admin:
+      request-timeout-ms: 3000
+      cache-ttl-ms: 30000
+      fallback-partitions: 12
+
 
 # ============================================
 #  Profile: risk
@@ -152,7 +181,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   kafka:
     consumer:
-      group-id: risk-engine
+      group-id: risk
 
 server:
   port: 0
@@ -160,10 +189,32 @@ server:
 tradinggate:
   role: risk
   topics:
+    # 소비 토픽
     trades-executed: trades.executed
-    risk-commands: risk.commands
-    clearing-settlement: clearing.settlement
 
+    # 발행 토픽
+    risk-commands: risk.commands
+
+  # Risk 모듈 설정
+  risk:
+    # 잔고 부족 체크 활성화
+    balance-check:
+      enabled: true
+
+    # 계정 블락 활성화
+    account-block:
+      enabled: true
+
+    # 이상 감지 활성화
+    anomaly-detection:
+      enabled: false
+
+# Logging
+logging:
+  level:
+    org.tradinggate.backend.risk: DEBUG
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: DEBUG
 
 # ============================================
 #  Profile: clearing
@@ -190,7 +241,20 @@ tradinggate:
   topics:
     trades-executed: trades.executed
     clearing-settlement: clearing.settlement
+  recon:
+    enabled: true
+    cron: "0 */10 * * * *"
 
+settlement:
+  policy:
+    default-product-type: SPOT
+    symbol-product-type:
+      1: SPOT
+      2: DERIVATIVE
+    mtm-override:
+      2: true
+    closing-price-override:
+      2: MARK
 
 # ============================================
 #  Profile: projection

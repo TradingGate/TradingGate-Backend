@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tradinggate-projection
+  namespace: tradinggate-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tradinggate-projection
+  template:
+    metadata:
+      labels:
+        app: tradinggate-projection
+    spec:
+      containers:
+        - name: projection
+          image: tradinggate-backend:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tradinggate-app-config
+            - secretRef:
+                name: tradinggate-app-secrets
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: projection
+            - name: SERVER_PORT
+              value: "8090"
+          ports:
+            - containerPort: 8090
+          startupProbe:
+            tcpSocket:
+              port: 8090
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 20

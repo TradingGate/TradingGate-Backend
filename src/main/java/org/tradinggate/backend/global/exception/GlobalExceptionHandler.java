@@ -20,12 +20,11 @@ public class GlobalExceptionHandler {
                         .error(ex.getStatusCode().getReasonPhrase())
                         .statusCode(ex.getStatusCode().value())
                         .timestamp(LocalDateTime.now())
-                        .build()
-        );
+                        .build());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<CommonErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
         return ResponseEntity.status(ex.getStatusCode())
                 .body(CommonErrorResponse.builder()
                         .message(ex.getBindingResult().getFieldError().getDefaultMessage())

@@ -8,6 +8,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
@@ -21,11 +22,11 @@ import java.util.concurrent.TimeUnit;
 
 import static org.tradinggate.backend.global.exception.UserErrorCode.DUPLICATE_REQUEST;
 
-
 @Log4j2
 @Aspect
 @Component
 @RequiredArgsConstructor
+@ConditionalOnBean(RedissonClient.class)
 public class RedissonLockAspect {
 
     private final RedissonClient redissonClient;
@@ -62,7 +63,8 @@ public class RedissonLockAspect {
             }
         }
 
-        Expression expression = parser.parseExpression(keyExpression);;
+        Expression expression = parser.parseExpression(keyExpression);
+        ;
         return expression.getValue(context, String.class);
     }
 

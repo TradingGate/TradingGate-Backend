@@ -1,0 +1,30 @@
+spring:
+  # Redisson 비활성화
+  redisson:
+    enabled: false
+
+  # Redis 비활성화
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+logging:
+  level:
+    org.springframework.boot.autoconfigure: ERROR
+    org.springframework: ERROR
+    org.redisson: OFF

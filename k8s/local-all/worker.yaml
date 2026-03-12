@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tradinggate-worker
+  namespace: tradinggate-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tradinggate-worker
+  template:
+    metadata:
+      labels:
+        app: tradinggate-worker
+    spec:
+      containers:
+        - name: worker
+          image: tradinggate-backend:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tradinggate-app-config
+            - secretRef:
+                name: tradinggate-app-secrets
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: worker
+            - name: SERVER_PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20

@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: tradinggate-demo
+spec:
+  selector:
+    app: kafka
+  ports:
+    - port: 9092
+      targetPort: 9092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: tradinggate-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: redpandadata/redpanda:v24.1.13
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - >
+              rpk redpanda start
+              --mode dev-container
+              --overprovisioned
+              --smp 1
+              --memory 1G
+              --reserve-memory 0M
+              --check=false
+              --node-id 1
+              --kafka-addr PLAINTEXT://0.0.0.0:9092
+              --advertise-kafka-addr PLAINTEXT://kafka:9092;
+          ports:
+            - containerPort: 9092
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 10
