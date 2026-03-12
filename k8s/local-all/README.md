@@ -16,6 +16,11 @@
 - 영속성/복구/확장성보다는 재현성과 단순성을 우선한다.
 
 ## 실행 순서
+Kubernetes namespace 생성
+```bash
+kubectl create namespace tradinggate-demo
+```
+
 ```bash
 docker build -t tradinggate-backend:local .
 cp k8s/local-all/secret.sample.yaml k8s/local-all/secret.yaml
@@ -34,12 +39,18 @@ NodePort 기준:
 - `http://localhost:31080`
 
 예시:
+Mac 기준
 ```bash
 curl -X POST 'http://localhost:31080/api/orders/create' \
   -H 'Content-Type: application/json' \
   --data '{"clientOrderId":"demo-all-k8s-1","symbol":"BTCUSDT","orderSide":"BUY","orderType":"LIMIT","timeInForce":"GTC","price":"50000","quantity":"1"}'
 ```
-
+Window 기준
+```bash
+curl.exe -X POST 'http://localhost:31080/api/orders/create' `
+>>   -H 'Content-Type: application/json' `
+>>   --data '{"clientOrderId":"demo-all-k8s-1","symbol":"BTCUSDT","orderSide":"BUY","orderType":"LIMIT","timeInForce":"GTC","price":"50000","quantity":"1"}'
+```
 ## 최종 검증 결과
 
 - `api -> worker -> projection -> risk -> clearing/recon` 전체 흐름을 `local-all`에서 실제로 검증했다.

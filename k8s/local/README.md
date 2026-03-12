@@ -23,6 +23,7 @@ docker build -t tradinggate-backend:local .
 샘플을 복사해 실제 시크릿 파일을 만든다.
 ```bash
 cp k8s/local/secret.sample.yaml k8s/local/secret.yaml
+kubectl create namespace tradinggate
 kubectl apply -f k8s/local/secret.yaml
 ```
 

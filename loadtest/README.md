@@ -3,7 +3,7 @@
 이 디렉터리는 TradingGate의 기본 부하/성능 검증 스크립트를 모아둔 곳이다.
 
 ## 전제
-
+- 시작 경로 : \TradingGate
 - 인프라 컨테이너 기동: `docker compose up -d`
 - 앱 프로필 기동: `api`, `worker`, `risk`, `clearing`
 - 현재 매칭 엔진은 정수 수량 기준으로만 안전하므로 `quantity=1` 기준으로 테스트한다.
@@ -12,22 +12,35 @@
 
 ### Smoke
 
+Mac / Linux (Bash, Zsh)
 ```bash
 docker run --rm -i \
   -v "$PWD/loadtest/k6:/scripts" \
   grafana/k6 run /scripts/orders-create-smoke.js
 ```
-
+Windows (PowerShell)
+```bash
+docker run --rm -i `
+  -v "${PWD}/loadtest/k6:/scripts" `
+  grafana/k6 run /scripts/orders-create-smoke.jsv
+```
 ### Ramp
 
+Mac / Linux (Bash, Zsh)
 ```bash
 docker run --rm -i \
   -v "$PWD/loadtest/k6:/scripts" \
   grafana/k6 run /scripts/orders-create-ramp.js
 ```
+Windows (PowerShell)
+```bash
+docker run --rm -i `
+  -v "${PWD}/loadtest/k6:/scripts" `
+  grafana/k6 run /scripts/orders-create-ramp.js
+```
 
 필요 시 환경 변수로 대상 변경 가능:
-
+Mac / Linux (Bash, Zsh)
 ```bash
 docker run --rm -i \
   -e BASE_URL=http://host.docker.internal:8080 \
@@ -37,9 +50,18 @@ docker run --rm -i \
   -v "$PWD/loadtest/k6:/scripts" \
   grafana/k6 run /scripts/orders-create-ramp.js
 ```
+Windows (PowerShell)
+```bash
+docker run --rm -i `
+  -e BASE_URL=http://host.docker.internal:8080 `
+  -e SYMBOL=BTCUSDT `
+  -e PRICE=50000 `
+  -e QUANTITY=1 `
+  -v "${PWD}/loadtest/k6:/scripts" `
+  grafana/k6 run /scripts/orders-create-ramp.js
+```
 
 ## 2. Kafka Burst 테스트
-
 ```bash
 bash loadtest/scripts/kafka-orders-burst.sh 1000 BTCUSDT 50000 1 10000
 ```
