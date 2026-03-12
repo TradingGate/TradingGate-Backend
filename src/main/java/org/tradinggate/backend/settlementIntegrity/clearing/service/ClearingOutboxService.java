@@ -5,6 +5,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.tradinggate.backend.settlementIntegrity.clearing.domain.ClearingBatch;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class ClearingOutboxService {
 
     private static final int PAGE_SIZE = 1000;
+    private static final Sort OUTBOX_PAGE_SORT = Sort.by(Sort.Direction.ASC, "id");
 
     private final ClearingBatchRepository clearingBatchRepository;
     private final ClearingResultRepository clearingResultRepository;
@@ -47,7 +49,8 @@ public class ClearingOutboxService {
         int page = 0;
         Page<ClearingResult> results;
         do {
-            results = clearingResultRepository.findByBatchId(batchId, PageRequest.of(page, PAGE_SIZE));
+            // 배치 결과를 페이지로 나눠 읽을 때 정렬이 없으면 대량 row에서 일부 누락/중복이 생길 수 있다.
+            results = clearingResultRepository.findByBatchId(batchId, PageRequest.of(page, PAGE_SIZE, OUTBOX_PAGE_SORT));
             if (results.isEmpty()) {
                 break;
             }
