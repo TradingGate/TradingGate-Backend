@@ -37,7 +37,7 @@ public class MatchingWorkerService {
      * - engine 결과가 비어있으면 publish하지 않는다(불필요한 이벤트/노이즈 방지).
      * - publish 메서드는 실패 시 예외를 던져야 하며, 여기서 삼키면 "처리 누락"이 발생한다.
      */
-    public void handle(OrderCommand command, long currentTimeMillis, String topic, int partition, long offset) {
+    public MatchingHandleMetrics handle(OrderCommand command, long currentTimeMillis, String topic, int partition, long offset) {
         if (command == null) {
             throw new IllegalArgumentException("OrderCommand must not be null");
         }
@@ -48,7 +48,10 @@ public class MatchingWorkerService {
         }
 
         MatchResult result = matchingEngine.handle(command, currentTimeMillis);
-        if (result.isEmpty()) return;
+        long engineCompletedAtMillis = System.currentTimeMillis();
+        if (result.isEmpty()) {
+            return new MatchingHandleMetrics(result, currentTimeMillis, engineCompletedAtMillis, engineCompletedAtMillis);
+        }
 
         // publish 실패는 곧 "처리 실패"로 본다 → 예외를 상위로 전달.
         if (!result.getOrderUpdates().isEmpty()) {
@@ -57,5 +60,8 @@ public class MatchingWorkerService {
         if (!result.getMatchFills().isEmpty()) {
             eventPublisher.publishMatchFills(symbol, result.getMatchFills(), topic, partition, offset);
         }
+
+        long publishCompletedAtMillis = System.currentTimeMillis();
+        return new MatchingHandleMetrics(result, currentTimeMillis, engineCompletedAtMillis, publishCompletedAtMillis);
     }
 }

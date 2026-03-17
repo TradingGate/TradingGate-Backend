@@ -10,6 +10,7 @@ import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.tradinggate.backend.matching.engine.model.OrderCommand;
+import org.tradinggate.backend.matching.engine.service.MatchingHandleMetrics;
 import org.tradinggate.backend.matching.engine.service.MatchingWorkerService;
 import org.tradinggate.backend.matching.snapshot.SnapshotCoordinator;
 import org.tradinggate.backend.matching.snapshot.shutdown.PartitionOffsetTracker;
@@ -61,7 +62,30 @@ public class OrdersInKafkaListener {
             }
 
             // handle 내부에서 output publish까지 완료되어야 처리 완료로 간주한다.
-            matchingWorkerService.handle(command, nowMillis, topic, partition, offset);
+            MatchingHandleMetrics metrics = matchingWorkerService.handle(command, nowMillis, topic, partition, offset);
+
+            long orderReceivedAtMillis = command.getReceivedAt() != null
+                    ? command.getReceivedAt().toEpochMilli()
+                    : nowMillis;
+            long queueLatencyMillis = Math.max(0L, nowMillis - orderReceivedAtMillis);
+            int matchFillCount = metrics.result().getMatchFills().size();
+            int orderUpdateCount = metrics.result().getOrderUpdates().size();
+
+            log.info(
+                    "MATCHING_METRIC symbol={} accountId={} clientOrderId={} partition={} offset={} queueLatencyMs={} engineDurationMs={} publishDurationMs={} totalHandleMs={} endToEndMs={} matchFillCount={} orderUpdateCount={}",
+                    command.getSymbol(),
+                    command.getAccountId(),
+                    command.getClientOrderId(),
+                    partition,
+                    offset,
+                    queueLatencyMillis,
+                    metrics.engineDurationMillis(),
+                    metrics.publishDurationMillis(),
+                    metrics.totalHandleDurationMillis(),
+                    Math.max(0L, metrics.publishCompletedAtMillis() - orderReceivedAtMillis),
+                    matchFillCount,
+                    orderUpdateCount
+            );
 
             ack.acknowledge();
 
