@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +43,7 @@ public class TradingProjectionService {
     LocalDateTime eventTime = dateTime(body, "eventTime");
 
     Optional<Order> existingOrder = orderRepository.findByUserIdAndClientOrderId(userId, clientOrderId)
-        .or(() -> orderRepository.findByOrderId(orderId));
+        .or(() -> orderRepository.findByUserIdAndOrderId(userId, orderId));
 
     if (existingOrder.isEmpty()) {
       orderRepository.save(Order.createProjection(
@@ -97,7 +98,8 @@ public class TradingProjectionService {
     Long tradeId = longValue(body, "tradeId");
     Long userId = longValue(body, "userId");
 
-    if (tradeRepository.findByEventId(eventId).isPresent()) {
+    if (tradeRepository.findByEventId(eventId).isPresent()
+        || tradeRepository.findByTradeIdAndUserId(tradeId, userId).isPresent()) {
       return;
     }
 
@@ -123,7 +125,17 @@ public class TradingProjectionService {
         dateTime(body, "execTime")
     );
 
-    tradeRepository.save(trade);
+    try {
+      tradeRepository.save(trade);
+    } catch (DataIntegrityViolationException e) {
+      // Duplicate replay can arrive with a different eventId but the same logical trade.
+      if (tradeRepository.findByTradeIdAndUserId(tradeId, userId).isPresent()) {
+        log.info("Skip duplicate trades.executed projection. eventId={}, tradeId={}, userId={}",
+            eventId, tradeId, userId);
+        return;
+      }
+      throw e;
+    }
   }
 
   private JsonNode extractBody(String message) throws Exception {

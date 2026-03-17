@@ -1,168 +1,96 @@
 # Load Test Guide
 
-이 디렉터리는 TradingGate의 기본 부하/성능 검증 스크립트를 모아둔 곳이다.
+이 디렉터리는 TradingGate의 주문 intake, 매칭, 정산 배치를 최신 기준으로 재현하는 스크립트를 모아둔 곳이다.
 
 ## 전제
-- 시작 경로 : \TradingGate
-- 인프라 컨테이너 기동: `docker compose up -d`
-- 앱 프로필 기동: `api`, `worker`, `risk`, `clearing`
-- 현재 매칭 엔진은 정수 수량 기준으로만 안전하므로 `quantity=1` 기준으로 테스트한다.
-- 아래 수치는 모두 로컬 단일 노드 개발 환경(Docker / Local Kubernetes)에서 측정한 값이다.
-- 주문 API는 동기 체결 완료가 아니라 Kafka에 publish 후 `202 Accepted`를 반환하는 경로이므로, 운영 처리량의 절대 기준값으로 해석하면 안 된다.
+- 기준 환경: `local-all` Kubernetes (`tradinggate-demo` namespace)
+- 아래 수치는 모두 로컬 단일 노드 개발 환경에서 측정한 값이다.
+- 주문 API는 동기 체결 완료가 아니라 Kafka publish 후 `202 Accepted`를 반환하므로, API 수치를 매칭 처리량으로 해석하면 안 된다.
+- 매칭 엔진은 현재 `quantity=1` 시나리오로 검증했다.
 
-## 1. API 부하 테스트 (`k6` via Docker)
+## 실행 방법
 
-### Smoke
+### 1. API intake (`k6`)
 
-Mac / Linux (Bash, Zsh)
+Mac / Linux
 ```bash
 docker run --rm -i \
+  -e BASE_URL=http://host.docker.internal:18080 \
   -v "$PWD/loadtest/k6:/scripts" \
   grafana/k6 run /scripts/orders-create-smoke.js
 ```
-Windows (PowerShell)
-```bash
-docker run --rm -i `
-  -v "${PWD}/loadtest/k6:/scripts" `
-  grafana/k6 run /scripts/orders-create-smoke.jsv
-```
-### Ramp
 
-Mac / Linux (Bash, Zsh)
-```bash
-docker run --rm -i \
-  -v "$PWD/loadtest/k6:/scripts" \
-  grafana/k6 run /scripts/orders-create-ramp.js
-```
-Windows (PowerShell)
-```bash
-docker run --rm -i `
-  -v "${PWD}/loadtest/k6:/scripts" `
-  grafana/k6 run /scripts/orders-create-ramp.js
-```
+Ramp / Soak도 동일하게 `orders-create-ramp.js`, `orders-create-soak.js`를 사용하면 된다.
 
-필요 시 환경 변수로 대상 변경 가능:
-Mac / Linux (Bash, Zsh)
-```bash
-docker run --rm -i \
-  -e BASE_URL=http://host.docker.internal:8080 \
-  -e SYMBOL=BTCUSDT \
-  -e PRICE=50000 \
-  -e QUANTITY=1 \
-  -v "$PWD/loadtest/k6:/scripts" \
-  grafana/k6 run /scripts/orders-create-ramp.js
-```
-Windows (PowerShell)
-```bash
-docker run --rm -i `
-  -e BASE_URL=http://host.docker.internal:8080 `
-  -e SYMBOL=BTCUSDT `
-  -e PRICE=50000 `
-  -e QUANTITY=1 `
-  -v "${PWD}/loadtest/k6:/scripts" `
-  grafana/k6 run /scripts/orders-create-ramp.js
-```
+### 2. Kafka burst
 
-## 2. Kafka Burst 테스트
 ```bash
 bash loadtest/scripts/kafka-orders-burst.sh 1000 BTCUSDT 50000 1 10000
 ```
 
-인자:
-- `COUNT`
-- `SYMBOL`
-- `PRICE`
-- `QUANTITY`
-- `START_USER_ID`
+이 스크립트는 HTTP가 아니라 `orders.in`에 직접 주문을 넣어서 downstream side effect를 확인하는 용도다.
 
-주의:
-- 이 테스트는 HTTP API 성능이 아니라 `orders.in -> worker -> risk -> ledger/account_balance` 파이프라인의 side effect를 관찰하기 위한 용도다.
-- 초기 잔고를 충분히 seed하지 않으면 일부 계정에서 음수 잔고/차단 이벤트가 발생할 수 있으므로, 결과는 순수 throughput benchmark가 아니라 현재 시나리오 기준 관찰값으로 본다.
-
-## 3. Clearing / Recon 배치 시간 측정
+### 3. Matching benchmark
 
 ```bash
-bash loadtest/scripts/batch-benchmark.sh clearing 2026-03-10
-bash loadtest/scripts/batch-benchmark.sh recon-linked 2026-03-10
-bash loadtest/scripts/batch-benchmark.sh recon-standalone 2026-03-10
+bash loadtest/scripts/matching-benchmark.sh 100 METRICUSDT 50000 1 940000000 metric-burst
 ```
 
-주의:
-- 이 스크립트는 배치 실행 시간을 간단히 측정하는 용도다.
-- `clearing` / `recon` 수치는 입력 ledger row 수와 결과 row 수에 따라 크게 달라지므로, 단일 숫자만으로 일반 성능을 주장하면 안 된다.
+이 스크립트는 fresh symbol에 주문을 직접 burst한 뒤 worker 로그의 `MATCHING_METRIC`를 집계해서 다음을 출력한다.
+- `queueLatencyMs`
+- `engineDurationMs`
+- `publishDurationMs`
+- `totalHandleMs`
+- `endToEndMs`
 
-## 결과 기록 예시
+즉 API intake가 아니라, worker가 주문을 소비한 뒤 매칭 계산과 publish에 실제로 얼마가 걸리는지 보는 용도다.
 
-| Test | Load | Duration | Success Rate | p95 | Notes |
-|---|---:|---:|---:|---:|---|
-| API Smoke | 5 VUs | 1m | 100% | 120ms | 정상 |
-| API Ramp | 50 VUs max | 6m | 98.7% | 420ms | 50 VUs부터 지연 증가 |
-| Kafka Burst | 1000 orders | burst | n/a | n/a | risk lag 관찰 |
-| Clearing EOD | 1 run | n/a | success | n/a | elapsedMs 기록 |
-| Recon Linked | 1 run | n/a | success | n/a | diffCount 확인 |
+### 4. Clearing / Recon batch benchmark
 
-## 현재 측정 결과
+```bash
+bash loadtest/scripts/batch-benchmark.sh clearing 2026-03-11
+bash loadtest/scripts/batch-benchmark.sh recon-linked 2026-03-11
+```
 
-| Test | Load | Duration | Success Rate | p95 | Notes |
-|---|---:|---:|---:|---:|---|
-| API Smoke | 5 VUs | 1m | 100% | 25.69ms | 1395 requests, avg 13.6ms, 23.18 req/s |
-| API Ramp | 50 VUs max | 6m | 99.99% | 21.07ms | 78231 requests, avg 11.61ms, 217.25 req/s, `202` 아닌 응답 9건 |
-| API Soak | 10 VUs | 10m | 99.99% | 15.68ms | `DURATION=10m` override 기준, 53055 requests, avg 11.04ms, 88.41 req/s, 실패 4건 |
-| Kafka Burst | 1000 orders | burst | n/a | n/a | 관찰 결과 기준 500 distinct trade_id, 1948 ledger rows, 1948 balance rows |
-| Clearing EOD | 1 run | 314ms | success | n/a | 소규모 데이터셋 기준, `forceNewRun=true` |
-| Recon Linked | 1 run | 191ms | success | n/a | 소규모 데이터셋 기준, `rerun=true`, `diffCount=0` |
+이 스크립트는 internal settlement API를 호출해 배치 한 번의 wall-clock 시간을 측정한다.
 
-## 해석 가이드
+## 최신 검증 결과
 
-- `API Smoke / Ramp / Soak`
-  - 로컬 비동기 주문 접수 API 기준으로는 무리 없는 수치다.
-  - `p95 10~30ms`, `수십~수백 req/s`는 현재 엔드포인트 특성상 자연스러운 범위다.
-  - 다만 이는 단일 노드 개발 환경 측정값이며, 운영 capacity claim으로 사용하면 안 된다.
-- `Kafka Burst`
-  - 체결 수와 ledger side effect를 확인하는 테스트다.
-  - `1000 orders -> 500 trades`는 BUY/SELL 쌍 매칭 관점에서 자연스럽지만, `1948 rows`는 현재 시나리오 기준 관찰값으로 보는 것이 맞다.
-- `Clearing / Recon`
-  - 현재 README의 숫자는 배치 실행이 가능한지 보는 1차 지표다.
-  - 일반 성능 비교 자료로 쓰려면 입력 ledger row 수, 결과 row 수, batch 범위를 같이 기록해야 한다.
-
-## 재검증 결과 (2026-03-12, local-all K8s + port-forward)
-
-이번 재검증은 `local-all` Kubernetes 데모 환경에서 `kubectl port-forward`를 통해 수행했다.
-이전 표의 수치와 실행 경로가 다르므로, 절대값을 직접 비교하기보다 "같은 시스템이 현재도 안정적으로 동작하는지"를 확인하는 용도로 보는 것이 맞다.
-
-| Test | Load | Duration | Success Rate | p95 | Notes |
-|---|---:|---:|---:|---:|---|
-| API Smoke | 5 VUs | 1m | 100% | 33.15ms | 1382 requests, avg 15.76ms, 23.03 req/s |
-| API Ramp | 50 VUs max | 6m | 100% | 50.48ms | 74446 requests, avg 18.17ms, 206.77 req/s |
-| API Soak | 10 VUs | 10m | 100% | 20.63ms | `DURATION=10m`, 53328 requests, avg 11.07ms, 88.87 req/s |
-| Clearing EOD | 1 run | 539ms | success | n/a | `resultCount=16`, `forceNewRun=true` |
-| Recon Linked | 1 run | 283ms | success | n/a | `diffCount=0`, `rerun=true` |
-
-추가 해석:
-- `Smoke`, `Soak`는 기존 README 수치와 큰 차이가 없었다.
-- `Ramp`는 기존 측정보다 p95가 높아졌는데, 이번 측정은 `kubectl port-forward`를 경유하므로 동일 조건 비교로 보면 안 된다.
-- `Clearing / Recon`은 이번 재검증에서 결과 row 수와 함께 다시 기록했다. 이전 수치보다 시간이 늘었지만 입력 규모도 더 컸다.
-
-## 대용량 배치 benchmark (2026-03-12)
-
-입력 데이터셋:
+기준:
 - 환경: `local-all K8s`
-- business date: `2026-03-11`
-- seed: `5000 accounts x 5 trades/account`
-- 생성 데이터:
-  - `ledger_entry = 75,000 rows`
-  - `account_balance = 10,000 rows`
-  - 기대 `clearing_result ≈ 10,016 rows` (seed 10,000 + 기존 소규모 16)
+- 같은 항목을 여러 번 측정한 경우에는 가장 최신 수치로 갱신했다.
+- 아직 다시 측정하지 않은 항목은 마지막으로 검증된 수치를 유지했다.
 
-측정 결과:
+| Area | Test | Measured At | Load | Latest Result | Interpretation |
+|---|---|---|---:|---|---|
+| API intake | k6 smoke | `2026-03-17` | 5 VUs, 1m | `1373 requests`, `22.81 req/s`, avg `17.61ms`, p95 `38.71ms`, success `100%` | 주문 접수 API 기준으로는 안정적이다. 다만 매칭 완료 시간은 아니다. |
+| API intake | k6 ramp | `2026-03-12` | 50 VUs max, 6m | `74446 requests`, `206.77 req/s`, avg `18.17ms`, p95 `50.48ms`, success `100%` | 로컬/port-forward 환경 기준 intake는 200 req/s 수준까지 안정적으로 동작했다. |
+| API intake | k6 soak | `2026-03-12` | 10 VUs, 10m | `53328 requests`, `88.87 req/s`, avg `11.07ms`, p95 `20.63ms`, success `100%` | 장시간 실행에서도 큰 흔들림 없이 유지됐다. |
+| Matching pipeline | Kafka burst | `2026-03-12` | `1000 orders` | `500 distinct trade_id`, `1948 ledger rows`, `1948 balance rows` | 주문 이벤트가 실제로 worker, risk, ledger/account_balance까지 흘러가는 것은 확인됐다. |
+| Matching engine | matching-benchmark | `2026-03-17` | `100 orders`, fresh symbol | `queue p95 3034ms`, `engine p95 4ms`, `publish p95 35ms`, `worker total p95 36ms`, `end-to-end p95 3039ms` | 이번 환경에서는 매칭 계산보다 Kafka queue 대기 시간이 더 큰 비중이었다. |
+| Settlement | Clearing EOD | `2026-03-17` | `ledger_entry 75,000` | `93,965ms`, `SUCCESS`, `resultCount=10,016` | 최신 재검증에서도 대용량 clearing이 끝까지 수행됐다. 현재 배치 비용은 큰 편이다. |
+| Settlement | Recon Linked | `2026-03-17` | `account_balance 10,000` | `2,368ms`, `SUCCESS`, `diffCount=0` | 최신 재검증에서도 projection mismatch 없이 완료됐다. |
 
-| Test | Input | Duration | Result |
-|---|---:|---:|---|
-| Clearing EOD | `ledger_entry 75,000` | `82,767ms` | `SUCCESS`, `resultCount=10,016` |
-| Recon Linked | `account_balance 10,000` | `190ms` | `SUCCESS`, `diffCount=0`, `clearingBatchId=32` |
+## 결과 해석
 
-해석:
-- 이 수치는 "대용량에서도 동작하는가"를 보기 위한 1차 benchmark다.
-- `Clearing` 시간에는 원장 집계뿐 아니라 `clearing_result` 저장과 `CLEARING.SETTLEMENT` outbox 적재까지 포함된다.
-- 대용량 재검증 과정에서 `ClearingOutboxService`의 페이지 조회가 정렬 없이 수행되어 일부 outbox가 누락되는 버그를 발견했고, `id ASC` 정렬로 수정 후 동일 데이터셋에서 `SUCCESS`를 확인했다.
-- 현재 `82.7초`는 정합성과 배치 안정성 중심의 MVP 수치로 해석하는 것이 맞고, 대규모 운영 기준 성능 최적화는 후속 과제다.
+### API intake
+- `k6` 수치는 주문 접수 응답시간이다.
+- 따라서 `p95 20~50ms`, `88~206 req/s`는 intake 성능으로 해석해야 하고, 매칭 throughput으로 바로 말하면 안 된다.
+
+### Matching
+- `matching-benchmark` 기준으로 worker 내부 매칭 계산 자체는 매우 가볍다.
+- 최신 측정에서 `engineDurationMs p95 = 4ms`, `publishDurationMs p95 = 35ms`였다.
+- 반대로 `queueLatencyMs p95 = 3034ms`가 크게 나온 것은, 체감 지연의 대부분이 worker 앞 Kafka queue 구간에서 발생했다는 뜻이다.
+- 따라서 현재 로컬 환경에서는 매칭 로직이 병목이라기보다, 비동기 queue 대기 시간이 더 크게 보였다.
+
+### Settlement
+- Clearing과 Recon은 둘 다 정상 완료됐다.
+- 최신 재검증 기준으로 대용량 benchmark에서 `Clearing`은 `93.9초`, `Recon`은 `2.37초`로 차이가 컸다.
+- 이는 recon이 비교적 가벼운 대조 배치이고, clearing은 원장 집계 + 결과 저장 + outbox 적재까지 포함하는 무거운 배치라는 현재 구조와 맞아떨어진다.
+
+## 결론
+
+- 주문 intake는 로컬 환경 기준 안정적이었다.
+- 매칭 엔진 계산 자체는 빠르고, 현재 관측된 지연의 대부분은 queue 대기 시간에 가깝다.
+- settlement는 대용량에서도 실행 가능하지만, 현재 비용은 clearing 쪽에 집중되어 있다.
+- 따라서 최신 기준 병목 후보는 매칭 로직보다 queue 구간과 clearing batch 쪽으로 보는 것이 더 적절하다.
