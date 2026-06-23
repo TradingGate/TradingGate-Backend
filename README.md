@@ -8,7 +8,7 @@ TradingGate Backend는 주문 접수, 매칭, 원장 기록, 잔고 Projection, 
 - **거래 이벤트를 어떻게 안정적으로 처리할 것인가**
 - **돈의 이동을 어떻게 검증 가능한 구조로 유지할 것인가**
 
-특히 이 프로젝트에서는 `ledger_entry`를 **SSOT (Single Source of Truth)** 로 두고, `account_balance`를 Projection으로 분리하는 구조를 중심에 둔다.
+특히 이 프로젝트에서는 `ledger_entry`를 **SSOT (Single Source of Truth)** 단일 진실 공급원으로 두고, `account_balance`를 Projection으로 분리하는 구조를 중심에 둔다.
 
 ---
 
